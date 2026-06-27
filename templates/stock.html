@@ -263,13 +263,20 @@
               <td colspan="9">
                 <form method="POST" action="/stock/update_prices" class="d-flex flex-wrap align-items-center gap-2 p-2">
                   <input type="hidden" name="item_id" value="{{ item.id }}">
-                  <strong>{{ item.name }}</strong>
+                  <strong class="me-1">{{ item.name }}</strong>
                   <label class="form-label mb-0">Purchase:</label>
                   <input type="number" name="purchase_price" id="pp-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
                   <label class="form-label mb-0">Bottle:</label>
                   <input type="number" name="selling_price_bottle" id="spb-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
                   <label class="form-label mb-0">Glass:</label>
                   <input type="number" name="selling_price_glass" id="spg-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
+                  <label class="form-label mb-0">Location:</label>
+                  <select name="location" id="loc-{{ item.id }}" class="form-select form-select-sm" style="width:180px">
+                    <option value="">— None —</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc }}" {{ 'selected' if item.location == loc else '' }}>{{ loc }}</option>
+                    {% endfor %}
+                  </select>
                   <button type="submit" class="btn btn-sm btn-primary">Save</button>
                   <button type="button" class="btn btn-sm btn-outline-secondary"
                           onclick="document.getElementById('edit-{{ item.id }}').style.display='none'">Cancel</button>

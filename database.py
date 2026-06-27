@@ -329,6 +329,44 @@ def init_db():
     except Exception:
         pass
 
+    # Pre-populate locations from the printed menu sheets
+    ITEM_LOCATIONS = {
+        # Dining Room — wine cabinet
+        "R3004": "Dining Room", "R3005": "Dining Room", "R3007": "Dining Room",
+        "R3008": "Dining Room", "R3009": "Dining Room", "R3010": "Dining Room",
+        "R3011": "Dining Room", "R3012": "Dining Room", "R3013": "Dining Room",
+        "R3015": "Dining Room", "R3016": "Dining Room", "R3017": "Dining Room",
+        "R3018": "Dining Room", "R3019": "Dining Room", "R3020": "Dining Room",
+        "R3021": "Dining Room", "R3022": "Dining Room", "R3023": "Dining Room",
+        "R3024": "Dining Room", "R3025": "Dining Room", "R3026": "Dining Room",
+        "R3027": "Dining Room", "R3028": "Dining Room", "R3029": "Dining Room",
+        "R3030": "Dining Room", "R3031": "Dining Room", "RT3016": "Dining Room",
+        # Loggia Fridge
+        "SW1003": "Loggia Fridge", "W2008": "Loggia Fridge", "W2009": "Loggia Fridge",
+        "W2010": "Loggia Fridge", "W2011": "Loggia Fridge",
+        "BR4006": "Loggia Fridge", "BR4007": "Loggia Fridge",
+        "SD6001": "Loggia Fridge", "SD6002": "Loggia Fridge",
+        "SD6006": "Loggia Fridge", "SD6007": "Loggia Fridge",
+        "SD6011": "Loggia Fridge", "SD6013": "Loggia Fridge",
+        "C8003":  "Loggia Fridge", "C8004":  "Loggia Fridge",
+        "D7001":  "Loggia Fridge", "D7005":  "Loggia Fridge",
+        "D7006":  "Loggia Fridge", "D7007":  "Loggia Fridge",
+        "SP5008": "Loggia Fridge", "SP5010": "Loggia Fridge",
+        # Loggia Glass Cabinet
+        "D7002":  "Loggia Glass Cabinet", "SP5012": "Loggia Glass Cabinet",
+        "SP5014": "Loggia Glass Cabinet", "SP5015": "Loggia Glass Cabinet",
+        "SP5018": "Loggia Glass Cabinet",
+    }
+    for item_id, loc in ITEM_LOCATIONS.items():
+        try:
+            c.execute(
+                "UPDATE stock_items SET location=? WHERE id=? AND (location IS NULL OR location='')",
+                (loc, item_id)
+            )
+        except Exception:
+            pass
+    conn.commit()
+
     # Sync master stock list — insert new, update prices/names for existing
     for item_id, category, name, pp, spb in STOCK_ITEMS:
         c.execute(

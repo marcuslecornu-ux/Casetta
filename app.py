@@ -263,12 +263,13 @@ def update_prices():
     item_id = request.form.get("item_id")
     conn.execute("""
         UPDATE stock_items
-        SET purchase_price=?, selling_price_bottle=?, selling_price_glass=?
+        SET purchase_price=?, selling_price_bottle=?, selling_price_glass=?, location=?
         WHERE id=?
     """, (
         float(request.form.get("purchase_price", 0)),
         float(request.form.get("selling_price_bottle", 0)),
         float(request.form.get("selling_price_glass", 0)),
+        request.form.get("location", ""),
         item_id
     ))
     conn.commit()
