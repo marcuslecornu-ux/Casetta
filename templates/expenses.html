@@ -46,9 +46,17 @@
         <form method="POST" action="{{ url_for('expenses') }}">
           <input type="hidden" name="is_recurring" id="is-recurring" value="0">
 
-          <div id="date-field" class="mb-2">
-            <label class="form-label">Date</label>
-            <input type="date" name="date" class="form-control form-control-sm" value="{{ today }}" required>
+          <!-- Entry date (always today, editable) -->
+          <div class="mb-2">
+            <label class="form-label">Entry Date <small class="text-muted">(date recorded)</small></label>
+            <input type="date" name="entry_date" class="form-control form-control-sm" value="{{ today }}" required>
+          </div>
+
+          <!-- Single expense month picker (hidden when recurring) -->
+          <div id="single-month-field" class="mb-2">
+            <label class="form-label">Expense Month <small class="text-muted">(period it applies to)</small></label>
+            <input type="month" name="expense_month" id="expense-month"
+                   class="form-control form-control-sm" value="{{ today[:7] }}" required>
           </div>
 
           <div class="mb-2">
@@ -107,16 +115,18 @@
             </div>
           </div>
 
+          <!-- Recurring month grid (hidden by default) -->
           <div id="recurring-fields" class="d-none border rounded p-2 mb-2 bg-light">
-            <div class="mb-2">
-              <label class="form-label">Start Month</label>
-              <input type="month" name="start_month" id="start-month" class="form-control form-control-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <small class="fw-bold text-muted">Select months to apply this expense:</small>
+              <div class="d-flex gap-1">
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1"
+                        style="font-size:.75rem" onclick="selectAllMonths(true)">All</button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1"
+                        style="font-size:.75rem" onclick="selectAllMonths(false)">Clear</button>
+              </div>
             </div>
-            <div class="mb-0">
-              <label class="form-label">Number of months</label>
-              <input type="number" name="repeat_months" class="form-control form-control-sm"
-                     min="1" max="24" value="12">
-            </div>
+            <div class="row g-1" id="month-grid"></div>
           </div>
 
           <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">
@@ -156,8 +166,11 @@
         <table class="table table-sm table-hover mb-0" id="exp-table">
           <thead class="sticky-top bg-white">
             <tr>
-              <th onclick="sortExp('date')" style="cursor:pointer;white-space:nowrap">
-                Date <span class="sort-icon" data-col="date">⇅</span>
+              <th onclick="sortExp('month')" style="cursor:pointer;white-space:nowrap">
+                Exp. Month <span class="sort-icon" data-col="month">⇅</span>
+              </th>
+              <th onclick="sortExp('entrydate')" style="cursor:pointer;white-space:nowrap">
+                Entered <span class="sort-icon" data-col="entrydate">⇅</span>
               </th>
               <th onclick="sortExp('category')" style="cursor:pointer">
                 Category <span class="sort-icon" data-col="category">⇅</span>
@@ -181,12 +194,18 @@
             <tr ondblclick="openEditExp(this)" style="cursor:pointer"
                 data-uid="{{ e.uid }}"
                 data-date="{{ e.date }}"
+                data-month="{{ e.date }}"
+                data-entrydate="{{ e.entry_date or e.date }}"
                 data-category="{{ e.category }}"
                 data-sub="{{ e.sub_category or '' }}"
                 data-comments="{{ e.comments or '' }}"
                 data-amount="{{ e.amount }}"
                 data-status="{{ e.status }}">
-              <td><small>{{ e.date[8:10] }}-{{ e.date[5:7] }}-{{ e.date[0:4] }}</small></td>
+              <td><small class="fw-semibold">{{ e.month }} {{ e.year }}</small></td>
+              <td><small class="text-muted">
+                {% set ed = e.entry_date or e.date %}
+                {{ ed[8:10] }}-{{ ed[5:7] }}-{{ ed[0:4] }}
+              </small></td>
               <td><small>{{ e.category }}</small></td>
               <td><small>{{ e.sub_category or '—' }}</small></td>
               <td><small>{{ e.comments or '' }}</small></td>
@@ -379,9 +398,15 @@
       </div>
       <form method="POST" id="editExpForm" action="">
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Date</label>
-            <input type="date" name="date" id="edit-date" class="form-control" required>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Entry Date <small class="text-muted">(recorded)</small></label>
+              <input type="date" name="entry_date" id="edit-entry-date" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Expense Month <small class="text-muted">(period)</small></label>
+              <input type="month" name="expense_month" id="edit-expense-month" class="form-control" required>
+            </div>
           </div>
           <div class="mb-3">
             <label class="form-label">Category</label>
@@ -451,24 +476,46 @@ function loadSuppliers(category, listId) {
   });
 }
 
-// ── Recurring toggle ─────────────────────────────────
+// ── Recurring toggle + month grid ────────────────────
 function toggleRecurring(cb) {
   const on = cb.checked;
   document.getElementById('is-recurring').value = on ? '1' : '0';
   document.getElementById('recurring-fields').classList.toggle('d-none', !on);
-  document.getElementById('date-field').classList.toggle('d-none', on);
-  if (on) {
-    const now = new Date();
-    document.getElementById('start-month').value =
-      `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('single-month-field').classList.toggle('d-none', on);
+  if (on) buildMonthGrid();
+}
+
+function buildMonthGrid() {
+  const grid = document.getElementById('month-grid');
+  grid.innerHTML = '';
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const lbl = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+    const col = document.createElement('div');
+    col.className = 'col-3 mb-1';
+    col.innerHTML = `<div class="form-check">
+      <input class="form-check-input month-cb" type="checkbox" name="months[]" value="${val}" id="m${val}">
+      <label class="form-check-label small" for="m${val}">${lbl}</label>
+    </div>`;
+    grid.appendChild(col);
   }
+}
+
+function selectAllMonths(checked) {
+  document.querySelectorAll('.month-cb').forEach(cb => cb.checked = checked);
 }
 
 // ── Edit modal ───────────────────────────────────────
 function openEditExp(row) {
   document.getElementById('editExpForm').action   = '/expenses/edit/'   + row.dataset.uid;
   document.getElementById('deleteExpForm').action = '/expenses/delete/' + row.dataset.uid;
-  document.getElementById('edit-date').value      = row.dataset.date;
+  // entry date
+  const ed = row.dataset.entrydate || row.dataset.date;
+  document.getElementById('edit-entry-date').value    = ed;
+  // expense month: take first 7 chars of the expense date "YYYY-MM"
+  document.getElementById('edit-expense-month').value = row.dataset.date.substring(0,7);
   document.getElementById('edit-category').value  = row.dataset.category;
   loadSuppliers(row.dataset.category, 'edit-sub-list');
   document.getElementById('edit-sub').value       = row.dataset.sub || '';

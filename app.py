@@ -428,34 +428,38 @@ def expenses():
             comments     = request.form.get("comments", "")
             amount       = float(request.form.get("amount", 0))
             status       = request.form.get("status", "Paid")
+            entry_date   = request.form.get("entry_date", date.today().isoformat())
             is_recurring = request.form.get("is_recurring") == "1"
 
             if is_recurring:
-                start_month   = request.form.get("start_month", "")
-                repeat_months = int(request.form.get("repeat_months", 1) or 1)
-                if start_month and len(start_month) >= 7:
-                    y, m = int(start_month[:4]), int(start_month[5:7])
-                    for i in range(repeat_months):
-                        cm = m + i
-                        cy = y + (cm - 1) // 12
-                        cm = ((cm - 1) % 12) + 1
-                        exp_date = f"{cy:04d}-{cm:02d}-01"
-                        dt = datetime.strptime(exp_date, "%Y-%m-%d")
-                        uid = generate_uid("EXP", str(i))
-                        conn.execute("""
-                            INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
-                            VALUES (?,?,?,?,?,?,?,?,?)
-                        """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), cy))
-                    conn.commit()
-                    flash(f"{repeat_months} recurring expense records created.", "success")
+                # Selected months from the checkbox grid e.g. ["2025-07", "2025-08"]
+                selected_months = request.form.getlist("months[]")
+                created = 0
+                for i, ym in enumerate(selected_months):
+                    exp_date = ym + "-01"
+                    dt = datetime.strptime(exp_date, "%Y-%m-%d")
+                    uid = generate_uid("EXP", f"{i}-{ym}")
+                    conn.execute("""
+                        INSERT INTO expenses
+                        (uid,date,entry_date,category,sub_category,comments,amount,status,month,year)
+                        VALUES (?,?,?,?,?,?,?,?,?,?)
+                    """, (uid, exp_date, entry_date, category, sub_cat, comments, amount,
+                          status, dt.strftime("%b"), dt.year))
+                    created += 1
+                conn.commit()
+                flash(f"{created} expense records created.", "success")
             else:
-                exp_date = request.form.get("date", date.today().isoformat())
+                # Single expense — date field is a month picker ("YYYY-MM"), convert to first of month
+                expense_month = request.form.get("expense_month", date.today().strftime("%Y-%m"))
+                exp_date = expense_month + "-01"
                 dt = datetime.strptime(exp_date, "%Y-%m-%d")
                 uid = generate_uid("EXP")
                 conn.execute("""
-                    INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
-                    VALUES (?,?,?,?,?,?,?,?,?)
-                """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), dt.year))
+                    INSERT INTO expenses
+                    (uid,date,entry_date,category,sub_category,comments,amount,status,month,year)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)
+                """, (uid, exp_date, entry_date, category, sub_cat, comments, amount,
+                      status, dt.strftime("%b"), dt.year))
                 conn.commit()
                 flash("Expense recorded.", "success")
         finally:
@@ -523,15 +527,19 @@ def expenses():
 @app.route("/expenses/edit/<uid>", methods=["POST"])
 @login_required
 def edit_expense(uid):
-    exp_date = request.form.get("date")
+    expense_month = request.form.get("expense_month", date.today().strftime("%Y-%m"))
+    exp_date  = expense_month + "-01"
+    entry_date = request.form.get("entry_date", date.today().isoformat())
     dt = datetime.strptime(exp_date, "%Y-%m-%d")
     conn = get_db()
     conn.execute("""
-        UPDATE expenses SET date=?,category=?,sub_category=?,comments=?,amount=?,status=?,month=?,year=?
+        UPDATE expenses
+        SET date=?,entry_date=?,category=?,sub_category=?,comments=?,amount=?,status=?,month=?,year=?
         WHERE uid=?
-    """, (exp_date, request.form.get("category"), request.form.get("sub_category",""),
-          request.form.get("comments",""), float(request.form.get("amount",0)),
-          request.form.get("status","Paid"), dt.strftime("%b"), dt.year, uid))
+    """, (exp_date, entry_date, request.form.get("category"),
+          request.form.get("sub_category",""), request.form.get("comments",""),
+          float(request.form.get("amount",0)), request.form.get("status","Paid"),
+          dt.strftime("%b"), dt.year, uid))
     conn.commit()
     conn.close()
     flash("Expense updated.", "success")

@@ -317,6 +317,7 @@ def init_db():
         "ALTER TABLE stock_items ADD COLUMN region TEXT DEFAULT ''",
         "ALTER TABLE stock_items ADD COLUMN grape TEXT DEFAULT ''",
         "ALTER TABLE stock_items ADD COLUMN bottle_size TEXT DEFAULT ''",
+        "ALTER TABLE expenses ADD COLUMN entry_date TEXT DEFAULT ''",
     ]
     for sql in migrations:
         try:
@@ -324,6 +325,13 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+    # Backfill entry_date = date for existing expense records
+    try:
+        c.execute("UPDATE expenses SET entry_date=date WHERE entry_date IS NULL OR entry_date=''")
+        conn.commit()
+    except Exception:
+        pass
 
     # Infer property for existing bookings with no property set
     try:
