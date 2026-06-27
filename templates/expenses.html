@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-receipt me-2"></i>Expenses</div>
+
+<div class="row g-4">
+
+  <!-- Entry Form -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Add Expense</div>
+      <div class="card-body">
+        <form method="POST">
+
+          <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" name="date" class="form-control" value="{{ today }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select name="category" class="form-select" required>
+              <option value="">— Select —</option>
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Sub-category / Supplier</label>
+            <input type="text" name="sub_category" class="form-control" placeholder="e.g. Agriturismo Insurance">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Comments</label>
+            <input type="text" name="comments" class="form-control" placeholder="Invoice ref, notes...">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Amount (€)</label>
+            <div class="input-group">
+              <span class="input-group-text">€</span>
+              <input type="number" name="amount" class="form-control" step="0.01" min="0" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="status" value="Paid" id="statusPaid" checked>
+                <label class="form-check-label" for="statusPaid">Paid</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="status" value="Forecast" id="statusForecast">
+                <label class="form-check-label" for="statusForecast">Forecast</label>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-circle me-2"></i>Save Expense
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right side: totals + list -->
+  <div class="col-lg-8">
+
+    <!-- Year filter -->
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="fw-bold">Year:</span>
+      {% for y in years %}
+      <a href="/expenses?year={{ y }}" class="btn btn-sm {{ 'btn-primary' if y == year_filter else 'btn-outline-primary' }}">{{ y }}</a>
+      {% endfor %}
+    </div>
+
+    <!-- Category totals -->
+    {% if totals %}
+    <div class="card mb-4">
+      <div class="card-header">Totals by Category — {{ year_filter }}</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Category</th><th class="text-end">Total (€)</th></tr></thead>
+          <tbody>
+            {% set grand = namespace(total=0) %}
+            {% for t in totals %}
+            {% set grand.total = grand.total + t.total %}
+            <tr>
+              <td>{{ t.category }}</td>
+              <td class="text-end fw-bold">€{{ "%.2f"|format(t.total) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-dark">
+              <td class="fw-bold">TOTAL</td>
+              <td class="text-end fw-bold">€{{ "%.2f"|format(grand.total) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Expense list -->
+    <div class="card">
+      <div class="card-header">All Expenses — {{ year_filter }}</div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Sub-category</th>
+              <th>Comments</th>
+              <th>Status</th>
+              <th class="text-end">Amount €</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in recent %}
+            <tr>
+              <td><small>{{ e.date }}</small></td>
+              <td><small>{{ e.category }}</small></td>
+              <td><small>{{ e.sub_category or '—' }}</small></td>
+              <td><small>{{ e.comments or '—' }}</small></td>
+              <td>
+                <span class="badge {{ 'bg-success' if e.status == 'Paid' else 'bg-warning text-dark' }}">
+                  {{ e.status }}
+                </span>
+              </td>
+              <td class="text-end fw-bold">€{{ "%.2f"|format(e.amount) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No expenses for {{ year_filter }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

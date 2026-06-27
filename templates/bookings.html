@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Bookings{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-calendar-check me-2"></i>Accommodation Bookings</div>
+
+<div class="row g-4">
+
+  <!-- Entry Form -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Add Booking</div>
+      <div class="card-body">
+        <form method="POST">
+
+          <div class="mb-3">
+            <label class="form-label">Guest Name</label>
+            <input type="text" name="guest_name" class="form-control" placeholder="Full name" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Room / Property</label>
+            <select name="room" class="form-select" required>
+              <option value="">— Select —</option>
+              {% for r in rooms %}
+              <option value="{{ r }}">{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-7">
+              <label class="form-label">Arrival</label>
+              <input type="date" name="arrival" class="form-control" required onchange="calcDeparture()">
+            </div>
+            <div class="col-5">
+              <label class="form-label">Nights</label>
+              <input type="number" name="num_nights" id="numNights" class="form-control" value="7" min="1" required onchange="calcDeparture()">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-muted">Departure (calculated)</label>
+            <input type="text" id="departureDisplay" class="form-control-plaintext fw-bold ps-0" readonly value="—">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Source</label>
+            <select name="source" id="sourceSelect" class="form-select" onchange="updateSourceCode()">
+              <option value="">— Select —</option>
+              {% for name, code in sources %}
+              <option value="{{ name }}" data-code="{{ code }}">{{ name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <input type="hidden" name="source_code" id="sourceCode" value="">
+
+          <div class="mb-3">
+            <label class="form-label">Rate Type</label>
+            <select name="rate_type" class="form-select">
+              <option value="RACK">RACK Rate</option>
+              <option value="TTT">TTT Rate</option>
+              <option value="CUSTOM">Custom / Negotiated</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Total Booking Value (€)</label>
+            <div class="input-group">
+              <span class="input-group-text">€</span>
+              <input type="number" name="total_cost" class="form-control" step="0.01" value="0">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Confirmed</label>
+            <select name="confirmed" class="form-select">
+              <option value="Yes">Yes — Confirmed</option>
+              <option value="Prov">Provisional</option>
+              <option value="CXL">Cancelled</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Special requests, dietary, etc."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-circle me-2"></i>Save Booking
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bookings list -->
+  <div class="col-lg-8">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="fw-bold">Year:</span>
+      {% for y in range(2023, 2028) %}
+      <a href="/bookings?year={{ y }}" class="btn btn-sm {{ 'btn-primary' if y == year_filter else 'btn-outline-primary' }}">{{ y }}</a>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="card-header">Bookings — {{ year_filter }}</div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Guest</th>
+              <th>Room</th>
+              <th>Arrival</th>
+              <th>Departure</th>
+              <th>Nights</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th class="text-end">€ Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in all_bookings %}
+            <tr class="{{ 'table-success' if b.confirmed == 'Yes' else ('table-warning' if b.confirmed == 'Prov' else 'table-secondary') }}">
+              <td>{{ b.guest_name }}</td>
+              <td><small>{{ b.room }}</small></td>
+              <td>{{ b.arrival }}</td>
+              <td>{{ b.departure or '—' }}</td>
+              <td>{{ b.num_nights }}</td>
+              <td><small>{{ b.source_code or b.source or '—' }}</small></td>
+              <td>
+                <span class="badge {{ 'bg-success' if b.confirmed == 'Yes' else ('bg-warning text-dark' if b.confirmed == 'Prov' else 'bg-secondary') }}">
+                  {{ b.confirmed }}
+                </span>
+              </td>
+              <td class="text-end fw-bold">€{{ "%.0f"|format(b.total_cost) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-4">No bookings for {{ year_filter }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcDeparture() {
+  const arrival = document.querySelector('[name="arrival"]').value;
+  const nights = parseInt(document.getElementById("numNights").value) || 0;
+  if (arrival && nights) {
+    const d = new Date(arrival);
+    d.setDate(d.getDate() + nights);
+    document.getElementById("departureDisplay").value = d.toLocaleDateString("en-GB", {day:"2-digit",month:"short",year:"numeric"});
+  }
+}
+
+function updateSourceCode() {
+  const sel = document.getElementById("sourceSelect");
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById("sourceCode").value = opt ? (opt.dataset.code || "") : "";
+}
+</script>
+{% endblock %}

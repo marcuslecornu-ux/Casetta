@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}Stock{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-box-seam me-2"></i>Stock Management</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="stockTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabMovement">Add Stock / Adjustment</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabNewItem">Add New Item</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabInventory">Current Inventory</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabHistory">Movement History</a></li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ADD STOCK MOVEMENT -->
+  <div class="tab-pane fade show active" id="tabMovement">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">Record Stock Movement</div>
+          <div class="card-body">
+            <form method="POST">
+              <input type="hidden" name="action" value="add_movement">
+
+              <div class="mb-3">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-control" value="{{ today }}" required>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Movement Type</label>
+                <select name="movement_type" class="form-select" required>
+                  <option value="Purchase">Purchase (Stock In)</option>
+                  <option value="Adjustment +">Adjustment + (Add)</option>
+                  <option value="Adjustment -">Adjustment - (Remove)</option>
+                  <option value="Wastage">Wastage / Write-off</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Category</label>
+                <select class="form-select" id="mvtCategory" onchange="filterMovementItems()">
+                  <option value="">— All categories —</option>
+                  {% for c in categories %}
+                  <option value="{{ c }}">{{ c }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Item</label>
+                <select name="item_id" id="mvtItem" class="form-select" required>
+                  {% for item in items %}
+                  <option value="{{ item.id }}" data-cat="{{ item.category }}">
+                    {{ item.name }} ({{ item.id }}) — Stock: {{ item.current_stock }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label">Quantity</label>
+                  <input type="number" name="quantity" class="form-control" value="1" min="1" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Unit Cost (€)</label>
+                  <input type="number" name="unit_cost" class="form-control" step="0.01" value="0">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <input type="text" name="notes" class="form-control" placeholder="Supplier, invoice ref, etc.">
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-check-circle me-2"></i>Record Movement
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD NEW ITEM -->
+  <div class="tab-pane fade" id="tabNewItem">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">Add New Stock Item</div>
+          <div class="card-body">
+            <form method="POST">
+              <input type="hidden" name="action" value="add_item">
+
+              <div class="row g-2 mb-3">
+                <div class="col-5">
+                  <label class="form-label">Item Code</label>
+                  <input type="text" name="new_id" class="form-control" placeholder="e.g. W2012" required>
+                  <div class="form-text">Must be unique</div>
+                </div>
+                <div class="col-7">
+                  <label class="form-label">Category</label>
+                  <select name="new_category" class="form-select" required>
+                    {% for c in categories %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Item Name</label>
+                <input type="text" name="new_name" class="form-control" placeholder="Full name of the item" required>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <label class="form-label">Purchase Price (€)</label>
+                  <input type="number" name="new_purchase_price" class="form-control" step="0.01" value="0">
+                </div>
+                <div class="col-4">
+                  <label class="form-label">Selling — Bottle (€)</label>
+                  <input type="number" name="new_selling_bottle" class="form-control" step="0.01" value="0">
+                </div>
+                <div class="col-4">
+                  <label class="form-label">Selling — Glass (€)</label>
+                  <input type="number" name="new_selling_glass" class="form-control" step="0.01" value="0">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Opening Stock</label>
+                <input type="number" name="new_stock" class="form-control" value="0" min="0">
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-plus-circle me-2"></i>Add to Stock List
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CURRENT INVENTORY -->
+  <div class="tab-pane fade" id="tabInventory">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        Current Stock Levels
+        <small class="text-white-50">Click any price to edit it</small>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th class="text-end">Purchase €</th>
+              <th class="text-end">Sell / Bottle €</th>
+              <th class="text-end">Sell / Glass €</th>
+              <th class="text-center">Stock</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set current_cat = namespace(val='') %}
+            {% for item in items %}
+            {% if item.category != current_cat.val %}
+            {% set current_cat.val = item.category %}
+            <tr class="table-secondary">
+              <td colspan="7" class="fw-bold">{{ item.category }}</td>
+            </tr>
+            {% endif %}
+            <tr class="{{ 'table-danger' if item.current_stock == 0 else ('table-warning' if item.current_stock <= 3 else '') }}" id="row-{{ item.id }}">
+              <td><code>{{ item.id }}</code></td>
+              <td>{{ item.name }}</td>
+              <!-- Display mode -->
+              <td class="text-end display-cell" data-id="{{ item.id }}">
+                {% if item.purchase_price %}€{{ "%.2f"|format(item.purchase_price) }}{% else %}<span class="text-danger fw-bold">— set price</span>{% endif %}
+              </td>
+              <td class="text-end display-cell" data-id="{{ item.id }}">
+                {% if item.selling_price_bottle %}€{{ "%.2f"|format(item.selling_price_bottle) }}{% else %}<span class="text-danger fw-bold">— set price</span>{% endif %}
+              </td>
+              <td class="text-end display-cell" data-id="{{ item.id }}">
+                {% if item.selling_price_glass %}€{{ "%.2f"|format(item.selling_price_glass) }}{% else %}—{% endif %}
+              </td>
+              <td class="text-center fw-bold">{{ item.current_stock }}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary py-0" onclick="editPrices('{{ item.id }}', {{ item.purchase_price or 0 }}, {{ item.selling_price_bottle or 0 }}, {{ item.selling_price_glass or 0 }})">
+                  Edit
+                </button>
+              </td>
+            </tr>
+            <!-- Edit row (hidden by default) -->
+            <tr id="edit-{{ item.id }}" style="display:none; background:#fffde7;">
+              <td colspan="7">
+                <form method="POST" action="/stock/update_prices" class="d-flex align-items-center gap-2 p-2">
+                  <input type="hidden" name="item_id" value="{{ item.id }}">
+                  <strong class="me-2">{{ item.name }}</strong>
+                  <label class="form-label mb-0 me-1">Purchase:</label>
+                  <input type="number" name="purchase_price" id="pp-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
+                  <label class="form-label mb-0 me-1">Bottle:</label>
+                  <input type="number" name="selling_price_bottle" id="spb-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
+                  <label class="form-label mb-0 me-1">Glass:</label>
+                  <input type="number" name="selling_price_glass" id="spg-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
+                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('edit-{{ item.id }}').style.display='none'">Cancel</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOVEMENT HISTORY -->
+  <div class="tab-pane fade" id="tabHistory">
+    <div class="card">
+      <div class="card-header">Recent Stock Movements</div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr><th>Date</th><th>Item</th><th>Type</th><th>Qty</th><th class="text-end">Unit Cost</th><th class="text-end">Total</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            {% for m in movements %}
+            <tr>
+              <td>{{ m.date }}</td>
+              <td><small>{{ m.item_name }}</small></td>
+              <td>
+                <span class="badge {{ 'bg-success' if 'Purchase' in m.movement_type or '+' in m.movement_type else 'bg-secondary' }}">
+                  {{ m.movement_type }}
+                </span>
+              </td>
+              <td>{{ m.quantity }}</td>
+              <td class="text-end">{% if m.unit_cost %}€{{ "%.2f"|format(m.unit_cost) }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if m.total_cost %}€{{ "%.2f"|format(m.total_cost) }}{% else %}—{% endif %}</td>
+              <td><small>{{ m.notes or '' }}</small></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No movements yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterMovementItems() {
+  const cat = document.getElementById("mvtCategory").value;
+  const sel = document.getElementById("mvtItem");
+  Array.from(sel.options).forEach(opt => {
+    opt.hidden = cat ? opt.dataset.cat !== cat : false;
+  });
+  const first = Array.from(sel.options).find(o => !o.hidden);
+  if (first) sel.value = first.value;
+}
+
+function editPrices(id, pp, spb, spg) {
+  // Hide any open edit rows
+  document.querySelectorAll('[id^="edit-"]').forEach(r => r.style.display = 'none');
+  document.getElementById('pp-' + id).value = pp;
+  document.getElementById('spb-' + id).value = spb;
+  document.getElementById('spg-' + id).value = spg;
+  document.getElementById('edit-' + id).style.display = '';
+  // Auto-open inventory tab
+  document.querySelector('[href="#tabInventory"]').click();
+}
+
+// Auto-open inventory tab if redirected back with #tabInventory
+if (window.location.hash === '#tabInventory') {
+  document.querySelector('[href="#tabInventory"]').click();
+}
+</script>
+{% endblock %}

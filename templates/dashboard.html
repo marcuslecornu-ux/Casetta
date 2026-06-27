@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-grid me-2"></i>Dashboard</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card stat-card p-3">
+      <div class="stat-value">€{{ "%.0f"|format(sales_today) }}</div>
+      <div class="stat-label">Drink Sales Today</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card p-3">
+      <div class="stat-value">€{{ "%.0f"|format(sales_month) }}</div>
+      <div class="stat-label">Drink Sales This Month</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card stat-card p-3">
+      <div class="stat-value">€{{ "%.0f"|format(expenses_month) }}</div>
+      <div class="stat-label">Expenses This Month</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cup-straw me-2"></i>Recent Drink Sales</span>
+        <a href="/sales" class="btn btn-sm btn-light">Add Sale</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Date</th><th>Room</th><th>Item</th><th>Qty</th><th class="text-end">€</th></tr></thead>
+          <tbody>
+            {% for s in recent_sales %}
+            <tr>
+              <td>{{ s.date }}</td>
+              <td><small>{{ s.room }}</small></td>
+              <td><small>{{ s.item_name }}</small></td>
+              <td>{{ s.quantity }}</td>
+              <td class="text-end">
+                {% if s.is_hosted %}
+                  <span class="badge badge-hosted">Hosted</span>
+                {% else %}
+                  €{{ "%.2f"|format(s.total_sale) }}
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No sales yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-check me-2"></i>Upcoming Bookings</span>
+        <a href="/bookings" class="btn btn-sm btn-light">Add Booking</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Guest</th><th>Room</th><th>Arrival</th><th>Nights</th><th class="text-end">€</th></tr></thead>
+          <tbody>
+            {% for b in upcoming_bookings %}
+            <tr>
+              <td>{{ b.guest_name }}</td>
+              <td><small>{{ b.room }}</small></td>
+              <td>{{ b.arrival }}</td>
+              <td>{{ b.num_nights }}</td>
+              <td class="text-end">€{{ "%.0f"|format(b.total_cost) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No upcoming bookings</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-receipt me-2"></i>Recent Expenses</span>
+        <a href="/expenses" class="btn btn-sm btn-light">Add Expense</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Date</th><th>Category</th><th>Description</th><th class="text-end">€</th></tr></thead>
+          <tbody>
+            {% for e in recent_expenses %}
+            <tr>
+              <td>{{ e.date }}</td>
+              <td><small>{{ e.category }}</small></td>
+              <td><small>{{ e.sub_category }}</small></td>
+              <td class="text-end">€{{ "%.2f"|format(e.amount) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">No expenses yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if low_stock %}
+  <div class="col-lg-6">
+    <div class="card border-warning">
+      <div class="card-header bg-warning text-dark">
+        <i class="bi bi-exclamation-triangle me-2"></i>Low Stock Alert
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Item</th><th>Category</th><th class="text-end">Stock</th></tr></thead>
+          <tbody>
+            {% for item in low_stock %}
+            <tr class="{{ 'table-danger' if item.current_stock == 0 else 'table-warning' }}">
+              <td>{{ item.name }}</td>
+              <td><small>{{ item.category }}</small></td>
+              <td class="text-end fw-bold">{{ item.current_stock }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

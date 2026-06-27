@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Drink Sales{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-cup-straw me-2"></i>Drink Sales</div>
+
+<div class="row g-4">
+  <!-- Entry Form -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Record a Sale</div>
+      <div class="card-body">
+        <form method="POST" id="saleForm">
+
+          <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" name="date" class="form-control" value="{{ today }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Room</label>
+            <select name="room" class="form-select" required>
+              <option value="">— Select room —</option>
+              {% for r in rooms %}
+              <option value="{{ r }}">{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select name="category" id="categorySelect" class="form-select" required onchange="filterItems()">
+              <option value="">— Select category —</option>
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Item</label>
+            <select name="item_id" id="itemSelect" class="form-select" required onchange="updatePrice()">
+              <option value="">— Select category first —</option>
+            </select>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Unit Type</label>
+              <select name="unit_type" id="unitType" class="form-select" onchange="updatePrice()">
+                <option value="Bottle">Bottle</option>
+                <option value="Glass">Glass</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Quantity</label>
+              <input type="number" name="quantity" id="quantity" class="form-control" value="1" min="1" onchange="calcTotal()">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Unit Price (€)</label>
+            <input type="number" name="unit_price" id="unitPrice" class="form-control" step="0.01" value="0" onchange="calcTotal()">
+            <div class="form-text" id="priceHint">Auto-filled from stock prices — override if needed.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Discount %</label>
+            <div class="input-group">
+              <input type="number" name="discount_pct" id="discountPct" class="form-control" value="0" min="0" max="100" step="1" onchange="calcTotal()">
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_hosted" id="isHosted" onchange="toggleHosted()">
+              <label class="form-check-label" for="isHosted">
+                <span class="badge badge-hosted">Hosted / Complimentary</span>
+                <small class="text-muted d-block">Guest receives drink at no charge</small>
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Notes <small class="fw-normal text-muted">(optional)</small></label>
+            <input type="text" name="notes" class="form-control" placeholder="e.g. Welcome drink on arrival">
+          </div>
+
+          <div class="card bg-light mb-3 p-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-bold">Total Sale</span>
+              <span class="fs-4 fw-bold text-success" id="totalDisplay">€0.00</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-circle me-2"></i>Record Sale
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Sales -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Recent Sales</div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Room</th>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Type</th>
+              <th>Disc%</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in recent %}
+            <tr>
+              <td><small>{{ s.date }}</small></td>
+              <td><small>{{ s.room }}</small></td>
+              <td><small>{{ s.item_name }}</small></td>
+              <td>{{ s.quantity }}</td>
+              <td><small>{{ s.unit_type }}</small></td>
+              <td>
+                {% if s.is_hosted %}
+                  <span class="badge badge-hosted">Hosted</span>
+                {% else %}
+                  {{ "%.0f"|format(s.discount_pct) }}%
+                {% endif %}
+              </td>
+              <td class="text-end fw-bold">
+                {% if s.is_hosted %}—{% else %}€{{ "%.2f"|format(s.total_sale) }}{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No sales recorded yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// All stock items indexed by category
+const allItems = {};
+{% for item in stock_items %}
+  const cat_{{ loop.index }} = "{{ item.category }}";
+  if (!allItems[cat_{{ loop.index }}]) allItems[cat_{{ loop.index }}] = [];
+  allItems[cat_{{ loop.index }}].push({
+    id: "{{ item.id }}",
+    name: "{{ item.name }}",
+    priceBottle: {{ item.selling_price_bottle or 0 }},
+    priceGlass: {{ item.selling_price_glass or 0 }}
+  });
+{% endfor %}
+
+function filterItems() {
+  const cat = document.getElementById("categorySelect").value;
+  const sel = document.getElementById("itemSelect");
+  sel.innerHTML = '<option value="">— Select item —</option>';
+  const items = allItems[cat] || [];
+  items.forEach(i => {
+    const opt = document.createElement("option");
+    opt.value = i.id;
+    opt.text = i.name;
+    opt.dataset.priceBottle = i.priceBottle;
+    opt.dataset.priceGlass = i.priceGlass;
+    sel.appendChild(opt);
+  });
+  updatePrice();
+}
+
+function updatePrice() {
+  const sel = document.getElementById("itemSelect");
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) { calcTotal(); return; }
+  const unitType = document.getElementById("unitType").value;
+  const price = parseFloat(unitType === "Glass" ? (opt.dataset.priceGlass || 0) : (opt.dataset.priceBottle || 0));
+  const priceInput = document.getElementById("unitPrice");
+  const hint = document.getElementById("priceHint");
+  priceInput.value = price.toFixed(2);
+  if (price === 0) {
+    priceInput.classList.add("border-danger");
+    hint.innerHTML = '<span class="text-danger fw-bold">⚠ No price set — enter manually, or go to Stock → Current Inventory to set prices.</span>';
+  } else {
+    priceInput.classList.remove("border-danger");
+    hint.textContent = "Auto-filled from stock prices — override if needed.";
+  }
+  calcTotal();
+}
+
+function calcTotal() {
+  const hosted = document.getElementById("isHosted").checked;
+  if (hosted) { document.getElementById("totalDisplay").textContent = "Hosted"; return; }
+  const price = parseFloat(document.getElementById("unitPrice").value) || 0;
+  const qty = parseInt(document.getElementById("quantity").value) || 1;
+  const disc = parseFloat(document.getElementById("discountPct").value) || 0;
+  const total = price * qty * (1 - disc / 100);
+  document.getElementById("totalDisplay").textContent = "€" + total.toFixed(2);
+}
+
+function toggleHosted() {
+  const hosted = document.getElementById("isHosted").checked;
+  document.getElementById("discountPct").disabled = hosted;
+  if (hosted) {
+    document.getElementById("discountPct").value = 100;
+    document.getElementById("totalDisplay").textContent = "Hosted";
+  } else {
+    document.getElementById("discountPct").value = 0;
+    calcTotal();
+  }
+}
+</script>
+{% endblock %}
