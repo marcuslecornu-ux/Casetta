@@ -262,6 +262,17 @@ def edit_sale(uid):
     return redirect(url_for("sales"))
 
 
+@app.route("/sales/delete/<uid>", methods=["POST"])
+@login_required
+def delete_sale(uid):
+    conn = get_db()
+    conn.execute("DELETE FROM drink_sales WHERE uid=?", (uid,))
+    conn.commit()
+    conn.close()
+    flash("Sale deleted.", "success")
+    return redirect(url_for("sales"))
+
+
 @app.route("/api/next_code/<category>")
 @login_required
 def next_code(category):

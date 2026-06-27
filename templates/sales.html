@@ -242,14 +242,21 @@
 
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save Changes</button>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-danger" onclick="deleteSale()">
+            <i class="bi bi-trash me-1"></i>Delete
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save Changes</button>
+          </div>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<form method="POST" id="deleteSaleForm" action="" style="display:none"></form>
 
 {% endblock %}
 
@@ -381,7 +388,8 @@ window.addEventListener("DOMContentLoaded", () => {
 // ── Edit Sale ─────────────────────────────────────────────────────
 function openEditSale(row) {
   const d = row.dataset;
-  document.getElementById("editSaleForm").action = "/sales/edit/" + d.uid;
+  document.getElementById("editSaleForm").action   = "/sales/edit/"   + d.uid;
+  document.getElementById("deleteSaleForm").action = "/sales/delete/" + d.uid;
   document.getElementById("es_date").value      = d.date;
   document.getElementById("es_room").value      = d.room;
   document.getElementById("es_category").value  = d.category;
@@ -394,6 +402,12 @@ function openEditSale(row) {
   document.getElementById("es_hosted").checked  = d.hosted === "1";
   document.getElementById("es_notes").value     = d.notes;
   new bootstrap.Modal(document.getElementById("editSaleModal")).show();
+}
+
+function deleteSale() {
+  if (confirm("Delete this sale record? This cannot be undone.")) {
+    document.getElementById("deleteSaleForm").submit();
+  }
 }
 </script>
 {% endblock %}
