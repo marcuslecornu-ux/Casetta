@@ -6,32 +6,35 @@
   <title>Casetta — Login</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Lato:wght@300;400;700&display=swap');
     body {
-      background: #4a7c59;
+      background: #3c2415;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: Arial, sans-serif;
+      font-family: 'Lato', Arial, sans-serif;
     }
     .login-card {
-      background: #fff;
-      border-radius: 16px;
+      background: #f7f3ee;
+      border-radius: 4px;
       padding: 2.5rem 2rem;
       width: 100%;
       max-width: 380px;
-      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
     }
-    .brand { color: #4a7c59; font-size: 1.8rem; font-weight: bold; text-align: center; margin-bottom: .25rem; }
-    .subtitle { color: #888; text-align: center; font-size: .9rem; margin-bottom: 2rem; }
-    .btn-primary { background: #4a7c59; border-color: #4a7c59; width: 100%; }
-    .btn-primary:hover { background: #3d6b4a; border-color: #3d6b4a; }
-    .form-control:focus { border-color: #4a7c59; box-shadow: 0 0 0 .2rem rgba(74,124,89,.25); }
+    .brand { text-align: center; margin-bottom: .5rem; }
+    .brand img { width: 130px; }
+    .subtitle { color: #999; text-align: center; font-size: .82rem; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 2rem; }
+    .form-label { font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: #5a3825; }
+    .btn-primary { background: #3c2415; border-color: #3c2415; width: 100%; letter-spacing: .08em; text-transform: uppercase; font-size: .85rem; }
+    .btn-primary:hover { background: #5a3825; border-color: #5a3825; }
+    .form-control:focus { border-color: #3c2415; box-shadow: 0 0 0 .2rem rgba(60,36,21,.2); }
   </style>
 </head>
 <body>
   <div class="login-card">
-    <div class="brand">🌿 Casetta</div>
+    <div class="brand"><img src="https://casetta.net/wp-content/themes/casetta-firenze/assets/img/logo.png" alt="Casetta Firenze"></div>
     <div class="subtitle">Organic farm &amp; accommodation</div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
