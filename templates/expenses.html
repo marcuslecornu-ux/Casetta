@@ -419,12 +419,9 @@
           </div>
         </div>
         <div class="modal-footer d-flex justify-content-between">
-          <form method="POST" id="deleteExpForm" action=""
-                onsubmit="return confirm('Delete this expense? This cannot be undone.')">
-            <button type="submit" class="btn btn-danger">
-              <i class="bi bi-trash me-1"></i>Delete
-            </button>
-          </form>
+          <button type="button" class="btn btn-danger" onclick="deleteExp()">
+            <i class="bi bi-trash me-1"></i>Delete
+          </button>
           <div class="d-flex gap-2">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -434,6 +431,9 @@
     </div>
   </div>
 </div>
+
+<!-- Delete form lives outside the edit form to avoid nested-form invalid HTML -->
+<form method="POST" id="deleteExpForm" action="" style="display:none"></form>
 
 
 <script>
@@ -468,14 +468,20 @@ function toggleRecurring(cb) {
 function openEditExp(row) {
   document.getElementById('editExpForm').action   = '/expenses/edit/'   + row.dataset.uid;
   document.getElementById('deleteExpForm').action = '/expenses/delete/' + row.dataset.uid;
-  document.getElementById('edit-date').value     = row.dataset.date;
-  document.getElementById('edit-category').value = row.dataset.category;
+  document.getElementById('edit-date').value      = row.dataset.date;
+  document.getElementById('edit-category').value  = row.dataset.category;
   loadSuppliers(row.dataset.category, 'edit-sub-list');
-  document.getElementById('edit-sub').value      = row.dataset.sub || '';
-  document.getElementById('edit-comments').value = row.dataset.comments || '';
-  document.getElementById('edit-amount').value   = row.dataset.amount;
-  document.getElementById('edit-status').value   = row.dataset.status;
+  document.getElementById('edit-sub').value       = row.dataset.sub || '';
+  document.getElementById('edit-comments').value  = row.dataset.comments || '';
+  document.getElementById('edit-amount').value    = row.dataset.amount;
+  document.getElementById('edit-status').value    = row.dataset.status;
   new bootstrap.Modal(document.getElementById('editExpModal')).show();
+}
+
+function deleteExp() {
+  if (confirm('Delete this expense? This cannot be undone.')) {
+    document.getElementById('deleteExpForm').submit();
+  }
 }
 
 // ── Table sort ───────────────────────────────────────
