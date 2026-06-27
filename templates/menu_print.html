@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Casetta — {{ location }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lato', Arial, sans-serif;
+      font-size: 12px;
+      color: #1a1008;
+      background: #fff;
+      padding: 20px 28px;
+    }
+
+    /* ── Header ──────────────────────────── */
+    .menu-header {
+      background: #3c2415;
+      color: #f7f3ee;
+      padding: 18px 22px 14px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 18px;
+      border-radius: 2px;
+    }
+    .menu-header svg { flex-shrink: 0; }
+    .menu-header-text { flex: 1; }
+    .menu-header h1 {
+      font-family: 'Lato', Arial, sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: #f7f3ee;
+      margin-bottom: 2px;
+    }
+    .menu-header h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: #e8ddd0;
+      letter-spacing: 1px;
+    }
+    .menu-header .subtitle {
+      font-size: 8.5px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #c9a87a;
+      margin-top: 3px;
+    }
+
+    /* ── Name field ───────────────────────── */
+    .name-line {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #5a3825;
+    }
+    .name-line .name-box {
+      flex: 1;
+      border-bottom: 1px solid #3c2415;
+      height: 18px;
+    }
+
+    /* ── Table ────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+      font-size: 11.5px;
+    }
+    thead tr {
+      background: #3c2415;
+      color: #f7f3ee;
+    }
+    thead th {
+      padding: 6px 8px;
+      text-align: left;
+      font-family: 'Lato', Arial, sans-serif;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    thead th.right { text-align: right; }
+    thead th.center { text-align: center; }
+
+    tbody tr { border-bottom: 1px solid #e0d6ca; }
+    tbody tr:nth-child(even) { background: #faf7f4; }
+    tbody td {
+      padding: 5px 8px;
+      vertical-align: top;
+      color: #1a1008;
+    }
+    tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody td.center { text-align: center; }
+    tbody td.name { font-weight: 600; }
+    tbody td.sub {
+      font-size: 10.5px;
+      color: #5a3825;
+      font-style: italic;
+    }
+
+    /* Tally box */
+    .tally-box {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 1px solid #3c2415;
+      vertical-align: middle;
+    }
+
+    /* ── Grape key (Dining Room only) ─────── */
+    .grape-key {
+      border: 1px solid #e0d6ca;
+      border-radius: 2px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 10.5px;
+      color: #5a3825;
+    }
+    .grape-key strong {
+      display: block;
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #3c2415;
+      margin-bottom: 5px;
+    }
+    .grape-key span { margin-right: 16px; }
+
+    /* ── Print button (hidden on print) ───── */
+    .print-btn {
+      display: block;
+      margin: 0 auto 20px;
+      padding: 8px 24px;
+      background: #3c2415;
+      color: #f7f3ee;
+      border: none;
+      border-radius: 2px;
+      font-family: 'Lato', Arial, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .print-btn:hover { background: #5a3825; }
+
+    .section-divider {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px;
+      color: #3c2415;
+      margin: 16px 0 8px;
+      border-bottom: 1px solid #c9a87a;
+      padding-bottom: 4px;
+    }
+
+    /* ── Print styles ─────────────────────── */
+    @media print {
+      body { padding: 8px 14px; }
+      .print-btn { display: none; }
+      .menu-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      @page { margin: 10mm 12mm; size: A4 portrait; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="menu-header">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="55" height="60">
+      <path d="M60,140 C55,110 48,75 60,30 C72,75 65,110 60,140Z" fill="#f7f3ee"/>
+      <line x1="52" y1="140" x2="68" y2="140" stroke="#f7f3ee" stroke-width="1.2"/>
+      <path d="M100,145 C94,110 86,70 100,20 C114,70 106,110 100,145Z" fill="#f7f3ee"/>
+      <line x1="91" y1="145" x2="109" y2="145" stroke="#f7f3ee" stroke-width="1.2"/>
+      <path d="M140,140 C135,110 128,75 140,30 C152,75 145,110 140,140Z" fill="#f7f3ee"/>
+      <line x1="132" y1="140" x2="148" y2="140" stroke="#f7f3ee" stroke-width="1.2"/>
+      <line x1="30" y1="158" x2="170" y2="158" stroke="#c9a87a" stroke-width="0.8"/>
+      <text x="100" y="178" font-family="Lato,Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="6" fill="#f7f3ee" text-anchor="middle">CASETTA</text>
+      <text x="100" y="198" font-family="Lato,Arial,sans-serif" font-size="10" font-weight="300" letter-spacing="5" fill="#c9a87a" text-anchor="middle">FIRENZE</text>
+    </svg>
+    <div class="menu-header-text">
+      <h1>Casetta Firenze</h1>
+      <h2>{{ location }}</h2>
+      <div class="subtitle">Organic Farm &amp; Accommodation · Tuscany</div>
+    </div>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">&#128438; Print This Menu</button>
+
+  <!-- Guest name field -->
+  <div class="name-line">
+    Name: <span class="name-box"></span>
+    &nbsp;&nbsp;&nbsp;Date: <span class="name-box" style="max-width:120px"></span>
+    &nbsp;&nbsp;&nbsp;Room: <span class="name-box" style="max-width:120px"></span>
+  </div>
+
+  {% if location == "Dining Room" %}
+  <!-- ── DINING ROOM: Wine Cabinet ─────────────────────────── -->
+
+  <div class="grape-key">
+    <strong>Grape Variety Key</strong>
+    <span>S = Sangiovese</span>
+    <span>CS = Cabernet Sauvignon</span>
+    <span>CF = Cabernet Franc</span>
+    <span>M = Merlot</span>
+    <span>MAL = Malvasia Nera</span>
+    <span>COL = Colorino</span>
+    <span>C = Canaiolo</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30%">Wine</th>
+        <th style="width:20%">Winery</th>
+        <th style="width:17%">Region</th>
+        <th style="width:10%">Grapes</th>
+        <th class="right" style="width:9%">€</th>
+        <th class="center" style="width:7%">Qty</th>
+        <th class="center" style="width:7%">Tally</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td class="name">{{ item.name }}</td>
+        <td>{{ item.winery or '' }}</td>
+        <td>{{ item.region or '' }}</td>
+        <td>{{ item.grape or '' }}</td>
+        <td class="right">
+          {% if item.selling_price_bottle and item.selling_price_bottle > 0 %}
+            € {{ "%.0f"|format(item.selling_price_bottle) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="center"></td>
+        <td class="center"><span class="tally-box"></span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;color:#999;padding:16px">No items in this location yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% elif location == "Loggia Fridge" %}
+  <!-- ── LOGGIA FRIDGE ──────────────────────────────────────── -->
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">Item</th>
+        <th style="width:20%">Category</th>
+        <th style="width:15%">Size</th>
+        <th class="right" style="width:10%">€</th>
+        <th class="center" style="width:8%">Qty</th>
+        <th class="center" style="width:7%">Tally</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td class="name">{{ item.name }}</td>
+        <td>{{ item.category }}</td>
+        <td>{{ item.bottle_size or '' }}</td>
+        <td class="right">
+          {% if item.selling_price_bottle and item.selling_price_bottle > 0 %}
+            € {{ "%.2f"|format(item.selling_price_bottle) }}
+          {% elif item.selling_price_glass and item.selling_price_glass > 0 %}
+            € {{ "%.2f"|format(item.selling_price_glass) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="center"></td>
+        <td class="center"><span class="tally-box"></span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="text-align:center;color:#999;padding:16px">No items in this location yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% elif location == "Loggia Glass Cabinet" %}
+  <!-- ── LOGGIA GLASS CABINET ───────────────────────────────── -->
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:25%">Spirit / Digestivo</th>
+        <th style="width:33%">Description</th>
+        <th style="width:14%">Category</th>
+        <th style="width:10%">Size</th>
+        <th class="right" style="width:10%">€ / glass</th>
+        <th class="center" style="width:8%">Tally</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td class="name">{{ item.name }}</td>
+        <td class="sub">{{ item.region or '' }}</td>
+        <td>{{ item.category }}</td>
+        <td>{{ item.bottle_size or '' }}</td>
+        <td class="right">
+          {% if item.selling_price_glass and item.selling_price_glass > 0 %}
+            € {{ "%.2f"|format(item.selling_price_glass) }}
+          {% elif item.selling_price_bottle and item.selling_price_bottle > 0 %}
+            € {{ "%.2f"|format(item.selling_price_bottle) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="center"><span class="tally-box"></span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="text-align:center;color:#999;padding:16px">No items in this location yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% else %}
+  <!-- ── GENERIC FALLBACK ───────────────────────────────────── -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">Item</th>
+        <th style="width:20%">Category</th>
+        <th class="right" style="width:15%">€</th>
+        <th class="center" style="width:12%">Qty</th>
+        <th class="center" style="width:13%">Tally</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td class="name">{{ item.name }}</td>
+        <td>{{ item.category }}</td>
+        <td class="right">
+          {% if item.selling_price_bottle and item.selling_price_bottle > 0 %}
+            € {{ "%.2f"|format(item.selling_price_bottle) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="center"></td>
+        <td class="center"><span class="tally-box"></span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;color:#999;padding:16px">No items found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div style="text-align:center;font-size:9px;color:#999;letter-spacing:0.06em;margin-top:18px;border-top:1px solid #e0d6ca;padding-top:8px;">
+    CASETTA FIRENZE · ORGANIC FARM &amp; ACCOMMODATION · TUSCANY
+  </div>
+
+</body>
+</html>

@@ -366,6 +366,64 @@ def init_db():
             pass
     conn.commit()
 
+    # Pre-populate winery / region / grape for Dining Room wines
+    DINING_ROOM_DETAILS = {
+        "R3004": ("Tenuta Tignanello",          "San Casciano",          "S/CS/CF"),
+        "R3005": ("Scopone",                    "Montalcino",            "S"),
+        "R3007": ("Mazzei",                     "Castellina in Chianti", "S/MAL/COL/M"),
+        "R3008": ("Fonterutoli / Mazzei",       "Castellina in Chianti", "S"),
+        "R3009": ("Poggio Al Sole",             "Tavarnelle",            "S/M/CS"),
+        "R3010": ("Poggio Al Sole",             "Tavarnelle",            "S/C"),
+        "R3011": ("D'Assolo Tenuta L'Apparita", "San Casciano",          "S"),
+        "R3012": ("D'Assolo Tenuta L'Apparita", "San Casciano",          "S"),
+        "R3013": ("Argiano",                    "Montalcino",            "S"),
+        "R3015": ("Corzano e Paterno",          "San Casciano",          "S/CS/M"),
+        "R3016": ("Giodo",                      "Montalcino",            "S"),
+        "R3017": ("Carobbio",                   "Panzano in Chianti",    "S/M/CS"),
+        "R3018": ("Tenuta Poggio Torselli",     "San Casciano",          "S/M/CS"),
+        "R3019": ("Mazzei",                     "Castellina in Chianti", "S/CS"),
+        "R3020": ("Fattoria di Barbi",          "Montalcino",            "S"),
+        "R3021": ("Tenuta Le Corti",            "San Casciano",          "S/C"),
+        "R3022": ("Tenuta Marsiliana / Le Corti","Maremma",              "M/CS"),
+        "R3023": ("Villa Le Corti",             "San Casciano",          "S"),
+        "R3024": ("Collemattoni",               "Montalcino",            "S"),
+        "R3025": ("Ricasoli",                   "Gaiole in Chianti",     "S/M/CS"),
+        "R3026": ("Cusona / Guicciardini",      "San Gimignano",         "S/M/CS"),
+        "R3027": ("Villa Le Corti",             "San Casciano",          "S"),
+        "R3028": ("Guicciardini Strozzi",       "Bolgheri",              "CS/M/S"),
+        "R3029": ("Marchese Antinori",          "Montalcino",            "S"),
+        "R3030": ("Il Palaggio di Panzano",     "Greve in Chianti",      "S"),
+        "R3031": ("Azienda Agricola Duemani",   "Riparbella / Toscana",  "CF"),
+        "RT3016": ("Cupano",                    "Montalcino",            "S"),
+    }
+    for item_id, (winery, region, grape) in DINING_ROOM_DETAILS.items():
+        try:
+            c.execute(
+                "UPDATE stock_items SET winery=?, region=?, grape=? WHERE id=? AND (winery IS NULL OR winery='')",
+                (winery, region, grape, item_id)
+            )
+        except Exception:
+            pass
+    conn.commit()
+
+    # Pre-populate descriptions for Loggia Glass Cabinet spirits
+    GLASS_CABINET_DESCRIPTIONS = {
+        "D7002":  "Distillation of grapes",
+        "SP5012": "Aged Colombian rum 1982",
+        "SP5014": "Distillation of agave",
+        "SP5015": "Anise-flavoured Greek spirit",
+        "SP5018": "Mediterranean gin — rosemary, basil, thyme, olive",
+    }
+    for item_id, desc in GLASS_CABINET_DESCRIPTIONS.items():
+        try:
+            c.execute(
+                "UPDATE stock_items SET region=? WHERE id=? AND (region IS NULL OR region='')",
+                (desc, item_id)
+            )
+        except Exception:
+            pass
+    conn.commit()
+
     # Sync master stock list — insert new, update prices/names for existing
     for item_id, category, name, pp, spb in STOCK_ITEMS:
         c.execute(

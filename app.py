@@ -673,6 +673,21 @@ def change_password():
     return redirect(url_for("admin"))
 
 
+@app.route("/admin/menu/<path:location>")
+@login_required
+def print_menu(location):
+    if not current_user.is_admin:
+        flash("Admin access only.", "danger")
+        return redirect(url_for("dashboard"))
+    conn = get_db()
+    items = conn.execute(
+        "SELECT * FROM stock_items WHERE location=? AND active=1 ORDER BY selling_price_bottle DESC",
+        (location,)
+    ).fetchall()
+    conn.close()
+    return render_template("menu_print.html", items=items, location=location)
+
+
 if __name__ == "__main__":
     init_db()
     print("\n  Casetta App running at http://localhost:5050\n")
