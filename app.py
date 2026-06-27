@@ -6,7 +6,8 @@ import os
 import csv
 import io
 from datetime import datetime, date
-from database import get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES, BOOKING_SOURCES, CASETTA_ROOMS, PROPERTIES
+from database import (get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES,
+                       BOOKING_SOURCES, CASETTA_ROOMS, PROPERTIES, LOCATIONS, CATEGORY_CODE_PREFIX)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "casetta-secret-2026-change-in-production")
@@ -219,6 +220,30 @@ def sales():
     )
 
 
+@app.route("/api/next_code/<category>")
+@login_required
+def next_code(category):
+    info = CATEGORY_CODE_PREFIX.get(category)
+    if not info:
+        return jsonify({"code": ""})
+    prefix, start = info
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM stock_items WHERE id LIKE ?", (f"{prefix}%",)
+    ).fetchall()
+    conn.close()
+    nums = set()
+    for row in existing:
+        try:
+            nums.add(int(row["id"][len(prefix):]))
+        except ValueError:
+            pass
+    n = start
+    while n in nums:
+        n += 1
+    return jsonify({"code": f"{prefix}{n}"})
+
+
 @app.route("/api/items/<category>")
 @login_required
 def items_by_category(category):
@@ -290,15 +315,22 @@ def stock():
             new_id = request.form.get("new_id", "").strip().upper()
             if new_id and not conn.execute("SELECT id FROM stock_items WHERE id=?", (new_id,)).fetchone():
                 conn.execute("""
-                    INSERT INTO stock_items (id, category, name, purchase_price, selling_price_bottle, selling_price_glass, current_stock)
-                    VALUES (?,?,?,?,?,?,?)
+                    INSERT INTO stock_items
+                    (id, category, name, purchase_price, selling_price_bottle, selling_price_glass,
+                     current_stock, location, winery, region, grape, bottle_size)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (new_id,
                       request.form.get("new_category"),
                       request.form.get("new_name"),
                       float(request.form.get("new_purchase_price", 0)),
                       float(request.form.get("new_selling_bottle", 0)),
                       float(request.form.get("new_selling_glass", 0)),
-                      int(request.form.get("new_stock", 0))))
+                      int(request.form.get("new_stock", 0)),
+                      request.form.get("new_location", ""),
+                      request.form.get("new_winery", ""),
+                      request.form.get("new_region", ""),
+                      request.form.get("new_grape", ""),
+                      request.form.get("new_bottle_size", "")))
                 conn.commit()
                 flash(f"New item {new_id} added.", "success")
             else:
@@ -318,8 +350,26 @@ def stock():
         items=items,
         movements=movements,
         categories=DRINK_CATEGORIES,
+        locations=LOCATIONS,
         today=date.today().isoformat()
     )
+
+
+@app.route("/stock/delete/<item_id>", methods=["POST"])
+@login_required
+def delete_stock_item(item_id):
+    conn = get_db()
+    item = conn.execute("SELECT * FROM stock_items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        flash("Item not found.", "warning")
+    elif item["current_stock"] != 0:
+        flash(f"Cannot delete {item_id} — stock level must be zero first.", "warning")
+    else:
+        conn.execute("DELETE FROM stock_items WHERE id=?", (item_id,))
+        conn.commit()
+        flash(f"Item {item_id} removed.", "success")
+    conn.close()
+    return redirect(url_for("stock") + "#tabInventory")
 
 
 # ─── EXPENSES ─────────────────────────────────────────────────────────────────

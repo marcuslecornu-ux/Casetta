@@ -10,8 +10,26 @@ ROOMS = ["Menta", "Lavanda", "Salvia", "Prezzemolo", "Cantina",
 PROPERTIES = ["Casetta", "Folegandros"]
 CASETTA_ROOMS = ["Whole House", "Cantina", "Lavanda", "Menta", "Prezzemolo", "Salvia"]
 
+LOCATIONS = ["Dining Room", "Loggia Fridge", "Loggia Glass Cabinet", "Cellar", "Kitchen"]
+
 DRINK_CATEGORIES = ["Beer", "Cocktail", "Digestivo", "Hot drinks", "Red", "Red (T)",
                     "Rose", "Soft drink", "Sparkling", "Spirit", "White", "White (T)"]
+
+# Maps category → (code_prefix, numeric_start) for auto-code generation
+CATEGORY_CODE_PREFIX = {
+    "Sparkling":  ("SW",  1001),
+    "White":      ("W",   2001),
+    "White (T)":  ("WT",  2012),
+    "Rose":       ("P",   7001),
+    "Red":        ("R",   3001),
+    "Red (T)":    ("RT",  3016),
+    "Beer":       ("BR",  4001),
+    "Cocktail":   ("C",   8001),
+    "Spirit":     ("SP",  5001),
+    "Digestivo":  ("D",   7001),
+    "Hot drinks": ("TC",  9001),
+    "Soft drink": ("SD",  6001),
+}
 
 EXPENSE_CATEGORIES = [
     "BUSINESS EXP & ENRICHMENT COSTS", "CAPITAL PROJECTS", "CONSULTANTS",
@@ -30,78 +48,134 @@ BOOKING_SOURCES = [
     ("Xenia Offer Fol", "COFFF"),
 ]
 
+# Format: (id, category, name, purchase_price, selling_price_bottle)
 STOCK_ITEMS = [
-    ("SW1001","Sparkling","Col de Salici Prosecco"),
-    ("SW1002","Sparkling","Villa Giustiani Prosecco Rosè"),
-    ("SW1003","Sparkling","Marchese Antinori Spumante"),
-    ("SW1004","Sparkling","Villa Folini Prosecco Rosè"),
-    ("SW1005","Sparkling","Franciacorta Corte Aura 2021"),
-    ("W2001","White","San Michele W"),
-    ("W2003","White","Rocca Bernarda Sauvignon"),
-    ("W2004","White","Rocca Bernarda Pinot Grigio"),
-    ("W2005","White","Vermentino Antinori"),
-    ("W2006","White","Vermentino Teia Villa Noviana"),
-    ("W2007","White","Poggio Al Sole Sangiovese Bianco"),
-    ("W2008","White","Vermentino Villa Marsiliana"),
-    ("W2009","White","Pinot Grigio Terlano"),
-    ("W2010","White","Tramin Sauvignon Bianco"),
-    ("W2011","White","Mastrojanni Trebbiano 2024"),
-    ("WT2012","White (T)","Vermentino Colli di Luni Fosso di Corsano Terenzuola 2023"),
-    ("WT2013","White (T)","Pinot Bianco Medievum Gumphof 2023"),
-    ("WT2014","White (T)","Grechetto La Torre a Civitella Sergio Mottura 2022"),
-    ("WT2015","White (T)","Gewurtztraminer Turmhof Tiefenbruner 2022"),
-    ("WT2016","White (T)","Adenzia Bianco Baglio del Cristo di Campobello 2023"),
-    ("WT2017","White (T)","Kerner Abbazia di Novacella 2022"),
-    ("R3001","Red","Sangiovese Grosseto"),
-    ("R3003","Red","Caiarossa IGT 2019"),
-    ("R3004","Red","Chianti Classico Gran Selezione"),
-    ("R3005","Red","Morellino di Scansano"),
-    ("R3006","Red","Brunello di Montalcino DOCG 2015"),
-    ("R3007","Red","Brunello di Montalcino Mastrojanni 2017"),
-    ("R3008","Red","Vino Nobile di Montepulciano"),
-    ("R3009","Red","Rosso di Montalcino"),
-    ("R3010","Red","Sassicaia 2019"),
-    ("R3011","Red","Barolo Cannubi 2018"),
-    ("R3012","Red","Amarone della Valpolicella"),
-    ("R3013","Red","Bolgari Rosso Antinori"),
-    ("R3014","Red","Chianti Classico Antinori"),
-    ("R3015","Red","Tignanello 2019"),
-    ("R3016","Red","Solaia 2019"),
-    ("R3017","Red","Campomaggio Radda Chianti Classico 2020"),
-    ("R3018","Red","Mastrojanni Rosso di Montalcino 2022"),
-    ("R3019","Red","Badia a Coltibuono Chianti Classico 2020"),
-    ("R3020","Red","Poggio Il Castellare Morellino Di Scansano 2021"),
-    ("RT3021","Red (T)","Etna Rosso Planeta 2021"),
-    ("RT3022","Red (T)","Cerasuolo di Vittoria Planeta 2022"),
-    ("RT3023","Red (T)","Aglianico del Vulture Basilisco 2020"),
-    ("RT3024","Red (T)","Nerello Mascalese Etna Rosso Terre Nere 2022"),
-    ("RO4001","Rose","Castel del Monte Rosato Il Falcone 2022"),
-    ("BR4002","Beer","Birra Moretti - Zero"),
-    ("BR4003","Beer","Birra Moretti"),
-    ("BR4004","Beer","Menabrea"),
-    ("CK5001","Cocktail","Aperol"),
-    ("CK5002","Cocktail","Campari"),
-    ("CK5003","Cocktail","Martini Bianco"),
-    ("CK5004","Cocktail","Martini Rosso"),
-    ("SP5005","Spirit","Absolute Vodka 700ml"),
-    ("SP5006","Spirit","Bacardi Rum 700ml"),
-    ("SP5007","Spirit","Bombay Gin"),
-    ("SP5008","Spirit","Casamigos Tequila 700ml"),
-    ("SP5009","Spirit","Grey Goose Vodka 700ml"),
-    ("SP5010","Spirit","VKA Tuscan Vodka 700ml"),
-    ("SP5011","Spirit","Havana Club Rum 1000ml"),
-    ("SP5012","Spirit","Tanqueray Ten Gin 1000ml"),
-    ("DG6001","Digestivo","Limoncello"),
-    ("DG6002","Digestivo","Grappa"),
-    ("DG6003","Digestivo","Amaro"),
-    ("SD6004","Soft drink","Still Water"),
-    ("SD6005","Soft drink","Sparkling Water"),
-    ("SD6006","Soft drink","Coca Cola"),
-    ("SD6007","Soft drink","Orange Juice"),
-    ("SD6008","Soft drink","Sparkling Water"),
-    ("HD7001","Hot drinks","Coffee"),
-    ("HD7002","Hot drinks","Tea"),
-    ("DW8001","Digestivo","Dessert Wine"),
+    # Sparkling
+    ("SW1001", "Sparkling", "Col de Salici Prosecco",              9.65,  28.00),
+    ("SW1002", "Sparkling", "Villa Giustiani Prosecco Rosè",        6.71,  23.00),
+    ("SW1003", "Sparkling", "Marchese Antinori Spumante",          19.52,  58.00),
+    ("SW1004", "Sparkling", "Villa Folini Prosecco Rosè",           6.90,  25.00),
+    ("SW1005", "Sparkling", "Franciacorta Corte Aura 2021",        14.23,  39.00),
+    # White
+    ("W2001",  "White",     "San Michele W",                        7.90,  24.00),
+    ("W2003",  "White",     "Rocca Bernarda Sauvignon",             0.00,   0.00),
+    ("W2004",  "White",     "Rocca Bernarda Pinot Grigio",         10.11,  30.00),
+    ("W2005",  "White",     "Vermentino Antinori",                 11.00,  33.00),
+    ("W2006",  "White",     "Vermentino Teia Villa Noviana",       20.55,  62.00),
+    ("W2007",  "White",     "Poggio Al Sole Sangiovese Bianco",     0.00,  28.00),
+    ("W2008",  "White",     "Vermentino Villa Marsiliana",         12.69,  33.00),
+    ("W2009",  "White",     "Pinot Grigio Terlano",                14.38,  35.00),
+    ("W2010",  "White",     "Tramin Sauvignon Bianco",             14.52,  36.00),
+    ("W2011",  "White",     "Mastrojanni Trebbiano 2024",          17.38,  42.00),
+    # White (T)
+    ("WT2012", "White (T)", "Vermentino Colli di Luni Fosso di Corsano Terenzuola 2023", 18.90, 37.00),
+    ("WT2013", "White (T)", "Pinot Bianco Medievum Gumphof 2023",  16.90,  33.00),
+    ("WT2014", "White (T)", "Grechetto La Torre a Civitella Sergio Mottura 2022", 24.90, 47.00),
+    ("WT2015", "White (T)", "Gewurtztraminer Turmhof Tiefenbruner 2022", 23.00, 50.00),
+    ("WT2016", "White (T)", "Adenzia Bianco Baglio del Cristo di Campobello 2023", 13.50, 27.00),
+    # Rose
+    ("P7001",  "Rose",      "Calafuria Rosè",                      12.06,  36.00),
+    ("P7002",  "Rose",      "Campo al Mare Bolgheri",              13.30,  36.00),
+    ("P7003",  "Rose",      "Sister Ula",                           5.84,  24.00),
+    ("P7004",  "Rose",      "Cassiopea",                           15.75,  36.00),
+    ("P7005",  "Rose",      "Sal'Asso Tenuta L'Apparita Rosè",     10.50,  39.00),
+    # Red
+    ("R3001",  "Red",       "San Michele R",                        8.00,  24.00),
+    ("R3002",  "Red",       "Rosso Montalcino",                    14.03,  42.00),
+    ("R3003",  "Red",       "Bolgheri Bruciato",                   17.73,  47.00),
+    ("R3004",  "Red",       "Marchese Antinori Riserva 2015",      21.80, 110.00),
+    ("R3005",  "Red",       "Brunello Scopone 2013",               18.00,  54.00),
+    ("R3006",  "Red",       "Ulla",                                 5.25,  22.00),
+    ("R3007",  "Red",       "Fonterutoli Chianti 2020",            14.49,  54.00),
+    ("R3008",  "Red",       "Fonterutoli Vicoregio 2019",          46.75, 165.00),
+    ("R3009",  "Red",       "Poggio Al Sole Trittico",              4.39,  23.00),
+    ("R3010",  "Red",       "Poggio Al Sole Chianti Classico",     12.81,  34.00),
+    ("R3011",  "Red",       "Tenuta L'Apparita D'Assolo Nero",     16.58,  38.00),
+    ("R3012",  "Red",       "Tenuta L'Apparita D'Assolo Selezione Bianco", 19.90, 46.00),
+    ("R3013",  "Red",       "Brunello Argiano 2020",               80.00, 180.00),
+    ("R3014",  "Red",       "Rosso Argiano 2023",                  25.00,  46.00),
+    ("R3015",  "Red",       "Tre Borri Corzano e Paterno 2018",    43.00,   0.00),
+    ("R3016",  "Red",       "Giodo Brunello di Montalcino",        83.00,   0.00),
+    ("R3017",  "Red",       "Magaldo 2016",                         0.00,   0.00),
+    ("R3018",  "Red",       "Tieri del Fula Poggio Torselli 2004", 13.33,   0.00),
+    ("R3019",  "Red",       "Fonterutoli Concerto 2020",           45.00,   0.00),
+    ("R3020",  "Red",       "Fattoria dei Bardi Brunello di Montalcino 2019", 35.00, 0.00),
+    ("R3021",  "Red",       "Le Corti Chianti Classico 2023",      14.00,   0.00),
+    ("R3022",  "Red",       "Le Corti Birillo 2022",               13.00,   0.00),
+    ("R3023",  "Red",       "Le Corti Don Tommaso 2021",           15.00,   0.00),
+    ("R3024",  "Red",       "Collemattoni Rosso di Montalcino 2021", 17.00, 0.00),
+    ("R3025",  "Red",       "Brolio Chianti Classico Ricasoli 2021", 20.00, 0.00),
+    ("R3026",  "Red",       "Millanni Cusona 2015",                40.00,   0.00),
+    ("R3027",  "Red",       "Le Corti Cortevecchia Chianti Classico 2022", 25.00, 0.00),
+    ("R3028",  "Red",       "Ocra Bolgheri Guicciardini 2018",     11.67,   0.00),
+    ("R3029",  "Red",       "Pian delle Vigne Rosso Montalcino 2016", 0.00, 58.00),
+    ("R3030",  "Red",       "La Vigna delle Bambole Chianti Classico 2015", 22.00, 0.00),
+    ("R3031",  "Red",       "Duemani 2017",                        90.00,   0.00),
+    ("R3032",  "Red",       "Matsu",                                0.00,   0.00),
+    # Red (T)
+    ("RT3016", "Red (T)",   "Rosso di Montalcino Cupano 2021",     43.90, 110.00),
+    ("RT3017", "Red (T)",   "Lacrima di Moro D'Alba Rubico Marotti Campi 2023", 8.50, 37.00),
+    ("RT3018", "Red (T)",   "Aglianico Jungano San Salvatore",     18.50,  25.00),
+    ("RT3019", "Red (T)",   "Etna Rosso Tornatore 2021",           15.30,  34.00),
+    ("RT3020", "Red (T)",   "Pelaverga di Verduno Basadone Castello di Verduno 2023", 17.50, 40.00),
+    # Beer
+    ("BR4001", "Beer",      "Birra Moretti",                        0.81,   7.00),
+    ("BR4002", "Beer",      "Birra Moretti Zero",                   0.94,   5.00),
+    ("BR4003", "Beer",      "Birra Messina",                        1.77,   5.00),
+    ("BR4004", "Beer",      "Birra Tassomiglia",                    2.43,   8.00),
+    ("BR4005", "Beer",      "Birra Maialetto",                      2.38,   8.00),
+    ("BR4006", "Beer",      "Birra Peroni",                         0.80,   5.00),
+    ("BR4007", "Beer",      "Birra Peroni 0%",                      1.10,   5.50),
+    # Cocktail
+    ("C8001",  "Cocktail",  "Roveta Dodici",                        0.00,  18.00),
+    ("C8003",  "Cocktail",  "Aperol Spritz",                        1.73,  10.00),
+    ("C8004",  "Cocktail",  "Campari Soda",                         0.24,   4.50),
+    # Spirit
+    ("SP5001", "Spirit",    "Dessert Wine",                        25.00,  75.00),
+    ("SP5002", "Spirit",    "Peter in Florence Gin 500ml",         31.94,  99.00),
+    ("SP5003", "Spirit",    "Ginepraio Pontedera Gin",             40.00, 120.00),
+    ("SP5004", "Spirit",    "Valombrosa Gin",                      55.00, 165.00),
+    ("SP5005", "Spirit",    "Bombay Gin",                         322.00,  69.00),
+    ("SP5006", "Spirit",    "Scape Grace Dry Gin 1000ml",          61.29, 183.87),
+    ("SP5007", "Spirit",    "Duchess Gin 700ml",                   40.00, 120.00),
+    ("SP5008", "Spirit",    "Grey Goose Vodka 700ml",              37.00, 117.00),
+    ("SP5009", "Spirit",    "Absolute Vodka 700ml",                39.31,  47.00),
+    ("SP5010", "Spirit",    "VKA Tuscan Vodka 700ml",              15.74, 132.00),
+    ("SP5011", "Spirit",    "Havana Club Rum 1000ml",               8.44,  56.00),
+    ("SP5012", "Spirit",    "Dictador Rum 1982",                   18.65, 830.00),
+    ("SP5013", "Spirit",    "Campari 1000ml",                     213.17,  56.97),
+    ("SP5014", "Spirit",    "Casamigos Tequila 700ml",             37.98, 165.00),
+    ("SP5015", "Spirit",    "Ouzo 200ml",                          17.50,  20.40),
+    ("SP5016", "Spirit",    "Bacardi Rum 700ml",                    8.13,  75.00),
+    ("SP5017", "Spirit",    "Whiskey Single Malt 700ml",           87.50,  65.52),
+    ("SP5018", "Spirit",    "Gin Mare 700ml",                      23.72, 120.00),
+    ("SP5019", "Spirit",    "Tanqueray Ten Gin 1000ml",            59.00,  99.00),
+    ("SP5020", "Spirit",    "Mount Gay Black Rum 700ml",           52.65,  89.00),
+    # Digestivo
+    ("D7001",  "Digestivo", "Molinari Sambucca 700ml",              0.00,  60.00),
+    ("D7002",  "Digestivo", "Poli Grappa 700ml",                   22.00,  66.00),
+    ("D7003",  "Digestivo", "Averna 700ml",                        16.16,  38.00),
+    ("D7004",  "Digestivo", "Vin Santo del Chianti Antinori",      32.00,  60.00),
+    ("D7005",  "Digestivo", "Limoncello 500ml",                     4.40,  30.00),
+    ("D7006",  "Digestivo", "Skinos 1000ml",                       15.48,  46.44),
+    ("D7007",  "Digestivo", "Amaro Certosa / Amaro Del Capo",      35.00, 105.00),
+    # Hot drinks
+    ("TC9001", "Hot drinks","Tea (Outside Breakfast)",              0.00,   3.50),
+    ("TC9002", "Hot drinks","Coffee (Outside Breakfast)",           0.00,   2.50),
+    ("TC9003", "Hot drinks","Cappuccino (Outside Breakfast)",       0.00,   3.50),
+    # Soft drink
+    ("SD6001", "Soft drink","Coke",                                 0.83,   3.00),
+    ("SD6002", "Soft drink","Coke Zero",                            0.85,   3.00),
+    ("SD6003", "Soft drink","Fanta",                                0.00,   0.00),
+    ("SD6004", "Soft drink","Lemon Soda",                           0.77,   3.00),
+    ("SD6005", "Soft drink","Schweppes Tonic 1L",                   1.20,   3.60),
+    ("SD6006", "Soft drink","Fevertree Tonic",                      1.30,   4.50),
+    ("SD6007", "Soft drink","Fevertree Ginger Beer",                1.24,   4.00),
+    ("SD6008", "Soft drink","Sparkling Water",                      9.78,   2.50),
+    ("SD6009", "Soft drink","Flat Mineral Water",                   1.52,   0.00),
+    ("SD6010", "Soft drink","Flat Mineral Boccioni",                0.50,   3.60),
+    ("SD6011", "Soft drink","Schweppes Soda Water",                 1.20,   3.00),
+    ("SD6013", "Soft drink","Kinley Lemon",                         0.90,   3.00),
 ]
 
 
@@ -122,7 +196,6 @@ def _is_db_healthy():
 
 
 def init_db():
-    # If DB file is corrupt, remove and start fresh
     if os.path.exists(DB_PATH) and not _is_db_healthy():
         os.remove(DB_PATH)
         journal = DB_PATH + "-journal"
@@ -140,7 +213,12 @@ def init_db():
             selling_price_bottle REAL DEFAULT 0,
             selling_price_glass REAL DEFAULT 0,
             current_stock INTEGER DEFAULT 0,
-            active INTEGER DEFAULT 1
+            active INTEGER DEFAULT 1,
+            location TEXT DEFAULT '',
+            winery TEXT DEFAULT '',
+            region TEXT DEFAULT '',
+            grape TEXT DEFAULT '',
+            bottle_size TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS drink_sales (
@@ -224,9 +302,24 @@ def init_db():
         );
     """)
 
-    # Migration: add property column to bookings if not exists
+    # Migrations — add columns silently if they don't exist yet
+    migrations = [
+        "ALTER TABLE bookings ADD COLUMN property TEXT",
+        "ALTER TABLE stock_items ADD COLUMN location TEXT DEFAULT ''",
+        "ALTER TABLE stock_items ADD COLUMN winery TEXT DEFAULT ''",
+        "ALTER TABLE stock_items ADD COLUMN region TEXT DEFAULT ''",
+        "ALTER TABLE stock_items ADD COLUMN grape TEXT DEFAULT ''",
+        "ALTER TABLE stock_items ADD COLUMN bottle_size TEXT DEFAULT ''",
+    ]
+    for sql in migrations:
+        try:
+            c.execute(sql)
+            conn.commit()
+        except Exception:
+            pass
+
+    # Infer property for existing bookings with no property set
     try:
-        c.execute("ALTER TABLE bookings ADD COLUMN property TEXT")
         c.execute("""
             UPDATE bookings SET property =
             CASE WHEN upper(room) LIKE '%FOL%' THEN 'Folegandros' ELSE 'Casetta' END
@@ -234,16 +327,19 @@ def init_db():
         """)
         conn.commit()
     except Exception:
-        pass  # Column already exists
+        pass
 
-    # Seed stock items if empty
-    count = c.execute("SELECT COUNT(*) FROM stock_items").fetchone()[0]
-    if count == 0:
-        for item_id, category, name in STOCK_ITEMS:
-            c.execute(
-                "INSERT OR IGNORE INTO stock_items (id, category, name) VALUES (?, ?, ?)",
-                (item_id, category, name)
-            )
+    # Sync master stock list — insert new, update prices/names for existing
+    for item_id, category, name, pp, spb in STOCK_ITEMS:
+        c.execute(
+            "INSERT OR IGNORE INTO stock_items (id, category, name, purchase_price, selling_price_bottle) VALUES (?,?,?,?,?)",
+            (item_id, category, name, pp, spb)
+        )
+        c.execute(
+            "UPDATE stock_items SET category=?, name=?, purchase_price=?, selling_price_bottle=? WHERE id=?",
+            (category, name, pp, spb, item_id)
+        )
+    conn.commit()
 
     # Seed default users if none exist
     user_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]

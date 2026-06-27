@@ -4,7 +4,6 @@
 {% block content %}
 <div class="section-title"><i class="bi bi-box-seam me-2"></i>Stock Management</div>
 
-<!-- Tabs -->
 <ul class="nav nav-tabs mb-4" id="stockTabs">
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabMovement">Add Stock / Adjustment</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabNewItem">Add New Item</a></li>
@@ -14,7 +13,7 @@
 
 <div class="tab-content">
 
-  <!-- ADD STOCK MOVEMENT -->
+  <!-- ── ADD STOCK MOVEMENT ────────────────────────────────────── -->
   <div class="tab-pane fade show active" id="tabMovement">
     <div class="row">
       <div class="col-md-6">
@@ -23,12 +22,10 @@
           <div class="card-body">
             <form method="POST">
               <input type="hidden" name="action" value="add_movement">
-
               <div class="mb-3">
                 <label class="form-label">Date</label>
                 <input type="date" name="date" class="form-control" value="{{ today }}" required>
               </div>
-
               <div class="mb-3">
                 <label class="form-label">Movement Type</label>
                 <select name="movement_type" class="form-select" required>
@@ -38,7 +35,6 @@
                   <option value="Wastage">Wastage / Write-off</option>
                 </select>
               </div>
-
               <div class="mb-3">
                 <label class="form-label">Category</label>
                 <select class="form-select" id="mvtCategory" onchange="filterMovementItems()">
@@ -48,7 +44,6 @@
                   {% endfor %}
                 </select>
               </div>
-
               <div class="mb-3">
                 <label class="form-label">Item</label>
                 <select name="item_id" id="mvtItem" class="form-select" required>
@@ -59,7 +54,6 @@
                   {% endfor %}
                 </select>
               </div>
-
               <div class="row g-2 mb-3">
                 <div class="col-6">
                   <label class="form-label">Quantity</label>
@@ -70,12 +64,10 @@
                   <input type="number" name="unit_cost" class="form-control" step="0.01" value="0">
                 </div>
               </div>
-
               <div class="mb-3">
                 <label class="form-label">Notes</label>
                 <input type="text" name="notes" class="form-control" placeholder="Supplier, invoice ref, etc.">
               </div>
-
               <button type="submit" class="btn btn-primary w-100">
                 <i class="bi bi-check-circle me-2"></i>Record Movement
               </button>
@@ -86,58 +78,110 @@
     </div>
   </div>
 
-  <!-- ADD NEW ITEM -->
+  <!-- ── ADD NEW ITEM ──────────────────────────────────────────── -->
   <div class="tab-pane fade" id="tabNewItem">
     <div class="row">
-      <div class="col-md-6">
+      <div class="col-md-7">
         <div class="card">
           <div class="card-header">Add New Stock Item</div>
           <div class="card-body">
-            <form method="POST">
+            <form method="POST" id="addItemForm">
               <input type="hidden" name="action" value="add_item">
 
+              <!-- Category first → auto-generates code -->
               <div class="row g-2 mb-3">
-                <div class="col-5">
-                  <label class="form-label">Item Code</label>
-                  <input type="text" name="new_id" class="form-control" placeholder="e.g. W2012" required>
-                  <div class="form-text">Must be unique</div>
-                </div>
-                <div class="col-7">
-                  <label class="form-label">Category</label>
-                  <select name="new_category" class="form-select" required>
+                <div class="col-6">
+                  <label class="form-label">Category <span class="text-danger">*</span></label>
+                  <select name="new_category" id="newCategory" class="form-select" required onchange="fetchNextCode()">
+                    <option value="">— Select category first —</option>
                     {% for c in categories %}
                     <option value="{{ c }}">{{ c }}</option>
                     {% endfor %}
                   </select>
                 </div>
+                <div class="col-6">
+                  <label class="form-label">Item Code <span class="text-danger">*</span>
+                    <small class="text-muted fw-normal">(auto-generated, must be unique)</small>
+                  </label>
+                  <input type="text" name="new_id" id="newCode" class="form-control font-monospace" placeholder="Select category above" required>
+                </div>
               </div>
 
               <div class="mb-3">
-                <label class="form-label">Item Name</label>
-                <input type="text" name="new_name" class="form-control" placeholder="Full name of the item" required>
+                <label class="form-label">Item Name <span class="text-danger">*</span></label>
+                <input type="text" name="new_name" class="form-control" placeholder="Full name, producer, vintage, etc." required>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <label class="form-label">Winery / Producer</label>
+                  <input type="text" name="new_winery" class="form-control" placeholder="e.g. Antinori">
+                </div>
+                <div class="col-4">
+                  <label class="form-label">Region</label>
+                  <input type="text" name="new_region" class="form-control" placeholder="e.g. Chianti Classico">
+                </div>
+                <div class="col-4">
+                  <label class="form-label">Grape</label>
+                  <input type="text" name="new_grape" class="form-control" placeholder="e.g. Sangiovese">
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <label class="form-label">Bottle Size</label>
+                  <select name="new_bottle_size" class="form-select">
+                    <option value="">— Select —</option>
+                    <option value="20 cl">20 cl</option>
+                    <option value="33 cl">33 cl</option>
+                    <option value="50 cl">50 cl</option>
+                    <option value="75 cl">75 cl (Standard)</option>
+                    <option value="100 cl">100 cl / 1 L</option>
+                    <option value="150 cl">150 cl (Magnum)</option>
+                    <option value="Various">Various</option>
+                  </select>
+                </div>
+                <div class="col-8">
+                  <label class="form-label">Location</label>
+                  <select name="new_location" class="form-select">
+                    <option value="">— Select location —</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc }}">{{ loc }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
               </div>
 
               <div class="row g-2 mb-3">
                 <div class="col-4">
                   <label class="form-label">Purchase Price (€)</label>
-                  <input type="number" name="new_purchase_price" class="form-control" step="0.01" value="0">
+                  <div class="input-group">
+                    <span class="input-group-text">€</span>
+                    <input type="number" name="new_purchase_price" class="form-control" step="0.01" value="0">
+                  </div>
                 </div>
                 <div class="col-4">
-                  <label class="form-label">Selling — Bottle (€)</label>
-                  <input type="number" name="new_selling_bottle" class="form-control" step="0.01" value="0">
+                  <label class="form-label">Sell / Bottle (€)</label>
+                  <div class="input-group">
+                    <span class="input-group-text">€</span>
+                    <input type="number" name="new_selling_bottle" class="form-control" step="0.01" value="0">
+                  </div>
                 </div>
                 <div class="col-4">
-                  <label class="form-label">Selling — Glass (€)</label>
-                  <input type="number" name="new_selling_glass" class="form-control" step="0.01" value="0">
+                  <label class="form-label">Sell / Glass (€)</label>
+                  <div class="input-group">
+                    <span class="input-group-text">€</span>
+                    <input type="number" name="new_selling_glass" class="form-control" step="0.01" value="0">
+                  </div>
                 </div>
               </div>
 
-              <div class="mb-3">
+              <div class="mb-4">
                 <label class="form-label">Opening Stock</label>
-                <input type="number" name="new_stock" class="form-control" value="0" min="0">
+                <input type="number" name="new_stock" class="form-control" value="0" min="0" style="max-width:120px">
               </div>
 
-              <button type="submit" class="btn btn-primary w-100">
+              <button type="submit" class="btn btn-primary">
                 <i class="bi bi-plus-circle me-2"></i>Add to Stock List
               </button>
             </form>
@@ -147,69 +191,88 @@
     </div>
   </div>
 
-  <!-- CURRENT INVENTORY -->
+  <!-- ── CURRENT INVENTORY ─────────────────────────────────────── -->
   <div class="tab-pane fade" id="tabInventory">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        Current Stock Levels
-        <small class="text-white-50">Click any price to edit it</small>
+        <span>Current Stock Levels</span>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="text" id="invSearch" class="form-control form-control-sm" style="width:200px" placeholder="🔍 Search…" oninput="filterInv()">
+          <small class="text-white-50 text-nowrap">Click Edit to update prices</small>
+        </div>
       </div>
-      <div class="card-body p-0">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
+      <div class="card-body p-0" style="overflow-x:auto">
+        <table class="table table-sm table-hover mb-0" id="invTable">
+          <thead style="position:sticky;top:0;z-index:1">
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th class="text-end">Purchase €</th>
-              <th class="text-end">Sell / Bottle €</th>
-              <th class="text-end">Sell / Glass €</th>
-              <th class="text-center">Stock</th>
+              <th class="sortable" onclick="sortInv(0)" style="cursor:pointer;white-space:nowrap">Code <span class="sort-icon">⇅</span></th>
+              <th class="sortable" onclick="sortInv(1)" style="cursor:pointer">Category <span class="sort-icon">⇅</span></th>
+              <th class="sortable" onclick="sortInv(2)" style="cursor:pointer">Name <span class="sort-icon">⇅</span></th>
+              <th class="sortable" onclick="sortInv(3)" style="cursor:pointer">Location <span class="sort-icon">⇅</span></th>
+              <th class="sortable text-end" onclick="sortInv(4)" style="cursor:pointer">Buy € <span class="sort-icon">⇅</span></th>
+              <th class="sortable text-end" onclick="sortInv(5)" style="cursor:pointer">Sell Btl <span class="sort-icon">⇅</span></th>
+              <th class="text-end">Sell Gls</th>
+              <th class="sortable text-center" onclick="sortInv(7)" style="cursor:pointer">Stock <span class="sort-icon">⇅</span></th>
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            {% set current_cat = namespace(val='') %}
+          <tbody id="invBody">
             {% for item in items %}
-            {% if item.category != current_cat.val %}
-            {% set current_cat.val = item.category %}
-            <tr class="table-secondary">
-              <td colspan="7" class="fw-bold">{{ item.category }}</td>
-            </tr>
-            {% endif %}
-            <tr class="{{ 'table-danger' if item.current_stock == 0 else ('table-warning' if item.current_stock <= 3 else '') }}" id="row-{{ item.id }}">
-              <td><code>{{ item.id }}</code></td>
-              <td>{{ item.name }}</td>
-              <!-- Display mode -->
-              <td class="text-end display-cell" data-id="{{ item.id }}">
-                {% if item.purchase_price %}€{{ "%.2f"|format(item.purchase_price) }}{% else %}<span class="text-danger fw-bold">— set price</span>{% endif %}
+            <tr class="{{ 'table-danger' if item.current_stock == 0 else ('table-warning' if item.current_stock <= 3 else '') }}"
+                id="row-{{ item.id }}">
+              <td><code style="font-size:.8rem">{{ item.id }}</code></td>
+              <td><small>{{ item.category }}</small></td>
+              <td>
+                {{ item.name }}
+                {% if item.winery or item.region or item.grape %}
+                <br><small class="text-muted">
+                  {% if item.winery %}{{ item.winery }}{% endif %}
+                  {% if item.region %} · {{ item.region }}{% endif %}
+                  {% if item.grape %} · {{ item.grape }}{% endif %}
+                  {% if item.bottle_size %} · {{ item.bottle_size }}{% endif %}
+                </small>
+                {% endif %}
               </td>
-              <td class="text-end display-cell" data-id="{{ item.id }}">
-                {% if item.selling_price_bottle %}€{{ "%.2f"|format(item.selling_price_bottle) }}{% else %}<span class="text-danger fw-bold">— set price</span>{% endif %}
+              <td><small>{{ item.location or '—' }}</small></td>
+              <td class="text-end">
+                {% if item.purchase_price %}€{{ "%.2f"|format(item.purchase_price) }}{% else %}<span class="text-danger small">—</span>{% endif %}
               </td>
-              <td class="text-end display-cell" data-id="{{ item.id }}">
-                {% if item.selling_price_glass %}€{{ "%.2f"|format(item.selling_price_glass) }}{% else %}—{% endif %}
+              <td class="text-end">
+                {% if item.selling_price_bottle %}€{{ "%.2f"|format(item.selling_price_bottle) }}{% else %}<span class="text-danger small fw-bold">set price</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if item.selling_price_glass %}€{{ "%.2f"|format(item.selling_price_glass) }}{% else %}<span class="text-muted small">—</span>{% endif %}
               </td>
               <td class="text-center fw-bold">{{ item.current_stock }}</td>
-              <td>
-                <button class="btn btn-sm btn-outline-secondary py-0" onclick="editPrices('{{ item.id }}', {{ item.purchase_price or 0 }}, {{ item.selling_price_bottle or 0 }}, {{ item.selling_price_glass or 0 }})">
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                        onclick="editPrices('{{ item.id }}', {{ item.purchase_price or 0 }}, {{ item.selling_price_bottle or 0 }}, {{ item.selling_price_glass or 0 }})">
                   Edit
                 </button>
+                {% if item.current_stock == 0 %}
+                <form method="POST" action="/stock/delete/{{ item.id }}" class="d-inline"
+                      onsubmit="return confirm('Delete {{ item.name }}? This cannot be undone.')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
               </td>
             </tr>
-            <!-- Edit row (hidden by default) -->
-            <tr id="edit-{{ item.id }}" style="display:none; background:#fffde7;">
-              <td colspan="7">
-                <form method="POST" action="/stock/update_prices" class="d-flex align-items-center gap-2 p-2">
+            <tr id="edit-{{ item.id }}" style="display:none;background:#fffde7">
+              <td colspan="9">
+                <form method="POST" action="/stock/update_prices" class="d-flex flex-wrap align-items-center gap-2 p-2">
                   <input type="hidden" name="item_id" value="{{ item.id }}">
-                  <strong class="me-2">{{ item.name }}</strong>
-                  <label class="form-label mb-0 me-1">Purchase:</label>
+                  <strong>{{ item.name }}</strong>
+                  <label class="form-label mb-0">Purchase:</label>
                   <input type="number" name="purchase_price" id="pp-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
-                  <label class="form-label mb-0 me-1">Bottle:</label>
+                  <label class="form-label mb-0">Bottle:</label>
                   <input type="number" name="selling_price_bottle" id="spb-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
-                  <label class="form-label mb-0 me-1">Glass:</label>
+                  <label class="form-label mb-0">Glass:</label>
                   <input type="number" name="selling_price_glass" id="spg-{{ item.id }}" class="form-control form-control-sm" style="width:90px" step="0.01" min="0">
                   <button type="submit" class="btn btn-sm btn-primary">Save</button>
-                  <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('edit-{{ item.id }}').style.display='none'">Cancel</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary"
+                          onclick="document.getElementById('edit-{{ item.id }}').style.display='none'">Cancel</button>
                 </form>
               </td>
             </tr>
@@ -220,7 +283,7 @@
     </div>
   </div>
 
-  <!-- MOVEMENT HISTORY -->
+  <!-- ── MOVEMENT HISTORY ──────────────────────────────────────── -->
   <div class="tab-pane fade" id="tabHistory">
     <div class="card">
       <div class="card-header">Recent Stock Movements</div>
@@ -258,6 +321,20 @@
 
 {% block scripts %}
 <script>
+// ── Add New Item — auto code ──────────────────────────────────────
+function fetchNextCode() {
+  const cat = document.getElementById("newCategory").value;
+  const codeField = document.getElementById("newCode");
+  if (!cat) { codeField.value = ""; codeField.placeholder = "Select category above"; return; }
+  fetch("/api/next_code/" + encodeURIComponent(cat))
+    .then(r => r.json())
+    .then(d => {
+      codeField.value = d.code;
+      codeField.placeholder = d.code;
+    });
+}
+
+// ── Stock Movement — category filter ─────────────────────────────
 function filterMovementItems() {
   const cat = document.getElementById("mvtCategory").value;
   const sel = document.getElementById("mvtItem");
@@ -268,19 +345,56 @@ function filterMovementItems() {
   if (first) sel.value = first.value;
 }
 
+// ── Inventory — price editor ──────────────────────────────────────
 function editPrices(id, pp, spb, spg) {
-  // Hide any open edit rows
-  document.querySelectorAll('[id^="edit-"]').forEach(r => r.style.display = 'none');
-  document.getElementById('pp-' + id).value = pp;
-  document.getElementById('spb-' + id).value = spb;
-  document.getElementById('spg-' + id).value = spg;
-  document.getElementById('edit-' + id).style.display = '';
-  // Auto-open inventory tab
+  document.querySelectorAll('[id^="edit-"]').forEach(r => r.style.display = "none");
+  document.getElementById("pp-"  + id).value = pp;
+  document.getElementById("spb-" + id).value = spb;
+  document.getElementById("spg-" + id).value = spg;
+  document.getElementById("edit-" + id).style.display = "";
   document.querySelector('[href="#tabInventory"]').click();
 }
 
-// Auto-open inventory tab if redirected back with #tabInventory
-if (window.location.hash === '#tabInventory') {
+// ── Inventory — search ────────────────────────────────────────────
+function filterInv() {
+  const q = document.getElementById("invSearch").value.toLowerCase();
+  document.querySelectorAll("#invBody tr:not([id^='edit-'])").forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+}
+
+// ── Inventory — sort ──────────────────────────────────────────────
+let invSortDir = {};
+function sortInv(col) {
+  const tbody = document.getElementById("invBody");
+  // Only sort data rows, not edit rows
+  const rows = Array.from(tbody.querySelectorAll("tr:not([id^='edit-'])"));
+  invSortDir[col] = !invSortDir[col];
+  const asc = invSortDir[col];
+
+  rows.sort((a, b) => {
+    const aT = a.cells[col] ? a.cells[col].textContent.trim() : "";
+    const bT = b.cells[col] ? b.cells[col].textContent.trim() : "";
+    if (col === 4 || col === 5 || col === 6 || col === 7) {
+      return asc ? parseFloat(aT) - parseFloat(bT) : parseFloat(bT) - parseFloat(aT);
+    }
+    return asc ? aT.localeCompare(bT) : bT.localeCompare(aT);
+  });
+
+  // Re-insert rows in sorted order, keeping each data row followed by its edit row
+  rows.forEach(row => {
+    tbody.appendChild(row);
+    const editRow = document.getElementById("edit-" + (row.id.replace("row-", "")));
+    if (editRow) tbody.appendChild(editRow);
+  });
+
+  document.querySelectorAll("#invTable .sort-icon").forEach(el => el.textContent = "⇅");
+  const headers = document.querySelectorAll("#invTable thead th");
+  if (headers[col]) headers[col].querySelector(".sort-icon").textContent = asc ? "↑" : "↓";
+}
+
+// Auto-open inventory tab if redirected with hash
+if (window.location.hash === "#tabInventory") {
   document.querySelector('[href="#tabInventory"]').click();
 }
 </script>
