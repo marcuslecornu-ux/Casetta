@@ -102,47 +102,54 @@
     </div>
   </div>
 
-  <!-- Recent Sales -->
+  <!-- Sales Table -->
   <div class="col-lg-7">
     <div class="card">
-      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Recent Sales</div>
-      <div class="card-body p-0">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Room</th>
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Type</th>
-              <th>Disc%</th>
-              <th class="text-end">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in recent %}
-            <tr>
-              <td><small>{{ s.date }}</small></td>
-              <td><small>{{ s.room }}</small></td>
-              <td><small>{{ s.item_name }}</small></td>
-              <td>{{ s.quantity }}</td>
-              <td><small>{{ s.unit_type }}</small></td>
-              <td>
-                {% if s.is_hosted %}
-                  <span class="badge badge-hosted">Hosted</span>
-                {% else %}
-                  {{ "%.0f"|format(s.discount_pct) }}%
-                {% endif %}
-              </td>
-              <td class="text-end fw-bold">
-                {% if s.is_hosted %}—{% else %}€{{ "%.2f"|format(s.total_sale) }}{% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="7" class="text-center text-muted py-4">No sales recorded yet</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2"></i>Sales History <span id="rowCount" class="badge bg-light text-dark ms-1"></span></span>
+      </div>
+      <div class="card-body p-2">
+        <!-- Search -->
+        <input type="text" id="salesSearch" class="form-control form-control-sm mb-2" placeholder="🔍 Search by room, item, date…" oninput="filterTable()">
+        <!-- Scrollable table -->
+        <div style="max-height: 70vh; overflow-y: auto;">
+          <table class="table table-sm table-hover mb-0" id="salesTable">
+            <thead style="position: sticky; top: 0; background: #f0ede6; z-index: 1;">
+              <tr>
+                <th class="sortable" onclick="sortTable(0)" style="cursor:pointer; white-space:nowrap">Date <span class="sort-icon">⇅</span></th>
+                <th class="sortable" onclick="sortTable(1)" style="cursor:pointer">Room <span class="sort-icon">⇅</span></th>
+                <th class="sortable" onclick="sortTable(2)" style="cursor:pointer">Item <span class="sort-icon">⇅</span></th>
+                <th class="sortable" onclick="sortTable(3)" style="cursor:pointer">Qty <span class="sort-icon">⇅</span></th>
+                <th class="sortable" onclick="sortTable(4)" style="cursor:pointer">Type <span class="sort-icon">⇅</span></th>
+                <th>Disc</th>
+                <th class="sortable text-end" onclick="sortTable(6)" style="cursor:pointer">Total <span class="sort-icon">⇅</span></th>
+              </tr>
+            </thead>
+            <tbody id="salesBody">
+              {% for s in recent %}
+              <tr>
+                <td><small>{{ s.date }}</small></td>
+                <td><small>{{ s.room }}</small></td>
+                <td><small>{{ s.item_name }}</small></td>
+                <td>{{ s.quantity }}</td>
+                <td><small>{{ s.unit_type }}</small></td>
+                <td>
+                  {% if s.is_hosted %}
+                    <span class="badge badge-hosted">Hosted</span>
+                  {% else %}
+                    {{ "%.0f"|format(s.discount_pct) }}%
+                  {% endif %}
+                </td>
+                <td class="text-end fw-bold" data-val="{{ s.total_sale }}">
+                  {% if s.is_hosted %}—{% else %}€{{ "%.2f"|format(s.total_sale) }}{% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-center text-muted py-4">No sales recorded yet</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -220,5 +227,58 @@ function toggleHosted() {
     calcTotal();
   }
 }
+
+// ── Search ────────────────────────────────────────────────────────────────────
+function filterTable() {
+  const q = document.getElementById("salesSearch").value.toLowerCase();
+  const rows = document.querySelectorAll("#salesBody tr");
+  let visible = 0;
+  rows.forEach(row => {
+    const match = row.textContent.toLowerCase().includes(q);
+    row.style.display = match ? "" : "none";
+    if (match) visible++;
+  });
+  document.getElementById("rowCount").textContent = visible + " rows";
+}
+
+// ── Sort ──────────────────────────────────────────────────────────────────────
+let sortDir = {};
+function sortTable(col) {
+  const tbody = document.getElementById("salesBody");
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  sortDir[col] = !sortDir[col];
+  const asc = sortDir[col];
+
+  rows.sort((a, b) => {
+    const aCell = a.cells[col];
+    const bCell = b.cells[col];
+    if (!aCell || !bCell) return 0;
+
+    // Use data-val for the total column (numeric)
+    let aVal = aCell.dataset.val !== undefined ? parseFloat(aCell.dataset.val) : aCell.textContent.trim();
+    let bVal = bCell.dataset.val !== undefined ? parseFloat(bCell.dataset.val) : bCell.textContent.trim();
+
+    // Numeric sort for quantity and total
+    if (col === 3 || col === 6) {
+      aVal = parseFloat(aVal) || 0;
+      bVal = parseFloat(bVal) || 0;
+      return asc ? aVal - bVal : bVal - aVal;
+    }
+    return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+
+  // Update sort icons
+  document.querySelectorAll(".sort-icon").forEach(el => el.textContent = "⇅");
+  const headers = document.querySelectorAll("#salesTable th");
+  if (headers[col]) headers[col].querySelector(".sort-icon").textContent = asc ? "↑" : "↓";
+}
+
+// Init row count
+window.addEventListener("DOMContentLoaded", () => {
+  const rows = document.querySelectorAll("#salesBody tr");
+  document.getElementById("rowCount").textContent = rows.length + " rows";
+});
 </script>
 {% endblock %}

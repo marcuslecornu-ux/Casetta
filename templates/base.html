@@ -66,6 +66,18 @@
     <a href="/bookings" class="nav-link {% if request.endpoint == 'bookings' %}active{% endif %}">
       <i class="bi bi-calendar-check"></i> Bookings
     </a>
+    {% if current_user.is_admin %}
+    <a href="/admin" class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
+      <i class="bi bi-shield-check"></i> Admin
+    </a>
+    {% endif %}
+    <div style="border-top:1px solid rgba(255,255,255,.2); margin: 1rem 0;"></div>
+    <div style="padding: .4rem 1.2rem; color:rgba(255,255,255,.6); font-size:.8rem;">
+      Signed in as <strong style="color:#fff;">{{ current_user.display_name }}</strong>
+    </div>
+    <a href="/logout" class="nav-link" style="color:rgba(255,255,255,.6);">
+      <i class="bi bi-box-arrow-left"></i> Log out
+    </a>
   </nav>
 </div>
 

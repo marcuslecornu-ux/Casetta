@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-shield-check me-2"></i>Admin Panel</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <div class="stat-value">{{ stats.drink_sales }}</div>
+      <div class="stat-label">Drink Sale Records</div>
+      <a href="/admin/export/drink_sales" class="btn btn-sm btn-outline-primary mt-2">Export CSV</a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <div class="stat-value">{{ stats.expenses }}</div>
+      <div class="stat-label">Expense Records</div>
+      <a href="/admin/export/expenses" class="btn btn-sm btn-outline-primary mt-2">Export CSV</a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <div class="stat-value">{{ stats.bookings }}</div>
+      <div class="stat-label">Booking Records</div>
+      <a href="/admin/export/bookings" class="btn btn-sm btn-outline-primary mt-2">Export CSV</a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <div class="stat-value">{{ stats.stock_items }}</div>
+      <div class="stat-label">Stock Items</div>
+      <a href="/admin/export/stock_items" class="btn btn-sm btn-outline-primary mt-2">Export CSV</a>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <div class="stat-value">€{{ "%.0f"|format(stats.total_sales_rev) }}</div>
+      <div class="stat-label">Total Drink Revenue</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-3 text-center">
+      <div class="stat-value">€{{ "%.0f"|format(stats.total_expenses) }}</div>
+      <div class="stat-label">Total Expenses</div>
+    </div>
+  </div>
+</div>
+
+<!-- User Management -->
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-people me-2"></i>Users</div>
+  <div class="card-body">
+    <table class="table table-sm mb-3">
+      <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Change Password</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.username }}</td>
+          <td>{{ u.display_name }}</td>
+          <td><span class="badge {{ 'bg-danger' if u.role == 'admin' else 'bg-secondary' }}">{{ u.role }}</span></td>
+          <td>
+            <form method="POST" action="/admin/change_password" class="d-flex gap-2">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <input type="password" name="new_password" class="form-control form-control-sm" placeholder="New password" style="width:160px">
+              <button type="submit" class="btn btn-sm btn-outline-primary">Set</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Export all -->
+<div class="card">
+  <div class="card-header"><i class="bi bi-download me-2"></i>Export All Data</div>
+  <div class="card-body d-flex flex-wrap gap-2">
+    <a href="/admin/export/drink_sales" class="btn btn-outline-primary">Drink Sales CSV</a>
+    <a href="/admin/export/expenses" class="btn btn-outline-primary">Expenses CSV</a>
+    <a href="/admin/export/bookings" class="btn btn-outline-primary">Bookings CSV</a>
+    <a href="/admin/export/stock_items" class="btn btn-outline-primary">Stock Items CSV</a>
+    <a href="/admin/export/stock_movements" class="btn btn-outline-primary">Stock Movements CSV</a>
+  </div>
+</div>
+{% endblock %}

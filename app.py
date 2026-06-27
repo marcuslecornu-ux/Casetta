@@ -1,11 +1,42 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import check_password_hash, generate_password_hash
 import sqlite3
 import os
+import csv
+import io
 from datetime import datetime, date
 from database import get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES, BOOKING_SOURCES
 
 app = Flask(__name__)
-app.secret_key = "casetta-secret-2026"
+app.secret_key = os.environ.get("SECRET_KEY", "casetta-secret-2026-change-in-production")
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Please log in to access Casetta."
+
+
+class User(UserMixin):
+    def __init__(self, id, username, role, display_name):
+        self.id = id
+        self.username = username
+        self.role = role
+        self.display_name = display_name
+
+    @property
+    def is_admin(self):
+        return self.role == "admin"
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    if row:
+        return User(row["id"], row["username"], row["role"], row["display_name"])
+    return None
 
 
 def generate_uid(prefix=""):
@@ -13,9 +44,37 @@ def generate_uid(prefix=""):
     return f"{now.strftime('%Y%m%d-%H%M%S')}-{prefix}"
 
 
+# ─── AUTH ─────────────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip().lower()
+        password = request.form.get("password", "")
+        conn = get_db()
+        row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        conn.close()
+        if row and check_password_hash(row["password_hash"], password):
+            user = User(row["id"], row["username"], row["role"], row["display_name"])
+            login_user(user, remember=True)
+            return redirect(url_for("dashboard"))
+        flash("Incorrect username or password.", "danger")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
+
 # ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def dashboard():
     conn = get_db()
     today = date.today().isoformat()
@@ -66,6 +125,7 @@ def dashboard():
 # ─── DRINK SALES ──────────────────────────────────────────────────────────────
 
 @app.route("/sales", methods=["GET", "POST"])
+@login_required
 def sales():
     if request.method == "POST":
         conn = get_db()
@@ -120,7 +180,7 @@ def sales():
         "SELECT * FROM stock_items WHERE active=1 ORDER BY category, name"
     ).fetchall()
     recent = conn.execute(
-        "SELECT * FROM drink_sales ORDER BY created_at DESC LIMIT 20"
+        "SELECT * FROM drink_sales ORDER BY date DESC, created_at DESC"
     ).fetchall()
     conn.close()
 
@@ -134,6 +194,7 @@ def sales():
 
 
 @app.route("/api/items/<category>")
+@login_required
 def items_by_category(category):
     conn = get_db()
     items = conn.execute(
@@ -145,6 +206,7 @@ def items_by_category(category):
 
 
 @app.route("/stock/update_prices", methods=["POST"])
+@login_required
 def update_prices():
     conn = get_db()
     item_id = request.form.get("item_id")
@@ -167,6 +229,7 @@ def update_prices():
 # ─── STOCK ────────────────────────────────────────────────────────────────────
 
 @app.route("/stock", methods=["GET", "POST"])
+@login_required
 def stock():
     conn = get_db()
 
@@ -236,6 +299,7 @@ def stock():
 # ─── EXPENSES ─────────────────────────────────────────────────────────────────
 
 @app.route("/expenses", methods=["GET", "POST"])
+@login_required
 def expenses():
     if request.method == "POST":
         conn = get_db()
@@ -287,6 +351,7 @@ def expenses():
 # ─── BOOKINGS ─────────────────────────────────────────────────────────────────
 
 @app.route("/bookings", methods=["GET", "POST"])
+@login_required
 def bookings():
     if request.method == "POST":
         conn = get_db()
@@ -334,6 +399,77 @@ def bookings():
         year_filter=int(year_filter),
         today=date.today().isoformat()
     )
+
+
+# ─── ADMIN ────────────────────────────────────────────────────────────────────
+
+@app.route("/admin")
+@login_required
+def admin():
+    if not current_user.is_admin:
+        flash("Admin access only.", "danger")
+        return redirect(url_for("dashboard"))
+    conn = get_db()
+    stats = {
+        "drink_sales":      conn.execute("SELECT COUNT(*) FROM drink_sales").fetchone()[0],
+        "expenses":         conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0],
+        "bookings":         conn.execute("SELECT COUNT(*) FROM bookings").fetchone()[0],
+        "stock_items":      conn.execute("SELECT COUNT(*) FROM stock_items").fetchone()[0],
+        "stock_movements":  conn.execute("SELECT COUNT(*) FROM stock_movements").fetchone()[0],
+        "total_sales_rev":  conn.execute("SELECT COALESCE(SUM(total_sale),0) FROM drink_sales WHERE is_hosted=0").fetchone()[0],
+        "total_expenses":   conn.execute("SELECT COALESCE(SUM(amount),0) FROM expenses").fetchone()[0],
+        "total_bookings_rev": conn.execute("SELECT COALESCE(SUM(total_cost),0) FROM bookings").fetchone()[0],
+    }
+    users = conn.execute("SELECT id, username, display_name, role FROM users").fetchall()
+    conn.close()
+    return render_template("admin.html", stats=stats, users=users)
+
+
+@app.route("/admin/export/<table>")
+@login_required
+def export_csv(table):
+    if not current_user.is_admin:
+        return "Forbidden", 403
+    allowed = {"drink_sales", "expenses", "bookings", "stock_items", "stock_movements"}
+    if table not in allowed:
+        return "Not found", 404
+    conn = get_db()
+    rows = conn.execute(f"SELECT * FROM {table}").fetchall()
+    conn.close()
+    if not rows:
+        flash(f"No data in {table}.", "warning")
+        return redirect(url_for("admin"))
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(rows[0].keys())
+    writer.writerows(rows)
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={table}.csv"}
+    )
+
+
+@app.route("/admin/change_password", methods=["POST"])
+@login_required
+def change_password():
+    if not current_user.is_admin:
+        return "Forbidden", 403
+    user_id = request.form.get("user_id")
+    new_pw  = request.form.get("new_password", "").strip()
+    if len(new_pw) < 6:
+        flash("Password must be at least 6 characters.", "warning")
+        return redirect(url_for("admin"))
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (generate_password_hash(new_pw), user_id)
+    )
+    conn.commit()
+    conn.close()
+    flash("Password updated.", "success")
+    return redirect(url_for("admin"))
 
 
 if __name__ == "__main__":

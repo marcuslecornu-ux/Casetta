@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from werkzeug.security import generate_password_hash
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "casetta.db")
 
@@ -198,6 +199,14 @@ def init_db():
             notes TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
+            display_name TEXT
+        );
     """)
 
     # Seed stock items if empty
@@ -208,6 +217,18 @@ def init_db():
                 "INSERT OR IGNORE INTO stock_items (id, category, name) VALUES (?, ?, ?)",
                 (item_id, category, name)
             )
+
+    # Seed default users if none exist
+    user_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if user_count == 0:
+        c.execute(
+            "INSERT OR IGNORE INTO users (username, password_hash, role, display_name) VALUES (?,?,?,?)",
+            ("marcus", generate_password_hash("casetta2026"), "admin", "Marcus")
+        )
+        c.execute(
+            "INSERT OR IGNORE INTO users (username, password_hash, role, display_name) VALUES (?,?,?,?)",
+            ("xenia", generate_password_hash("casetta2026"), "user", "Xenia")
+        )
 
     conn.commit()
     conn.close()
