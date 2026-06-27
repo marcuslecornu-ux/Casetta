@@ -66,9 +66,12 @@ def check_double_booking(conn, property_name, room, arrival, departure, exclude_
     return conflicts
 
 
-def generate_uid(prefix=""):
+def generate_uid(prefix="", suffix=""):
     now = datetime.now()
-    return f"{now.strftime('%Y%m%d-%H%M%S')}-{prefix}"
+    s = f"{now.strftime('%Y%m%d-%H%M%S%f')}-{prefix}"
+    if suffix:
+        s += f"-{suffix}"
+    return s
 
 
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
@@ -419,43 +422,44 @@ def delete_stock_item(item_id):
 def expenses():
     if request.method == "POST":
         conn = get_db()
-        category    = request.form.get("category")
-        sub_cat     = request.form.get("sub_category", "")
-        comments    = request.form.get("comments", "")
-        amount      = float(request.form.get("amount", 0))
-        status      = request.form.get("status", "Paid")
-        is_recurring = request.form.get("is_recurring") == "1"
+        try:
+            category     = request.form.get("category")
+            sub_cat      = request.form.get("sub_category", "")
+            comments     = request.form.get("comments", "")
+            amount       = float(request.form.get("amount", 0))
+            status       = request.form.get("status", "Paid")
+            is_recurring = request.form.get("is_recurring") == "1"
 
-        if is_recurring:
-            start_month   = request.form.get("start_month", "")   # "2025-01"
-            repeat_months = int(request.form.get("repeat_months", 1) or 1)
-            if start_month and len(start_month) >= 7:
-                y, m = int(start_month[:4]), int(start_month[5:7])
-                for i in range(repeat_months):
-                    cm = m + i
-                    cy = y + (cm - 1) // 12
-                    cm = ((cm - 1) % 12) + 1
-                    exp_date = f"{cy:04d}-{cm:02d}-01"
-                    dt = datetime.strptime(exp_date, "%Y-%m-%d")
-                    uid = generate_uid("EXP")
-                    conn.execute("""
-                        INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
-                        VALUES (?,?,?,?,?,?,?,?,?)
-                    """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), cy))
+            if is_recurring:
+                start_month   = request.form.get("start_month", "")
+                repeat_months = int(request.form.get("repeat_months", 1) or 1)
+                if start_month and len(start_month) >= 7:
+                    y, m = int(start_month[:4]), int(start_month[5:7])
+                    for i in range(repeat_months):
+                        cm = m + i
+                        cy = y + (cm - 1) // 12
+                        cm = ((cm - 1) % 12) + 1
+                        exp_date = f"{cy:04d}-{cm:02d}-01"
+                        dt = datetime.strptime(exp_date, "%Y-%m-%d")
+                        uid = generate_uid("EXP", str(i))
+                        conn.execute("""
+                            INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
+                            VALUES (?,?,?,?,?,?,?,?,?)
+                        """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), cy))
+                    conn.commit()
+                    flash(f"{repeat_months} recurring expense records created.", "success")
+            else:
+                exp_date = request.form.get("date", date.today().isoformat())
+                dt = datetime.strptime(exp_date, "%Y-%m-%d")
+                uid = generate_uid("EXP")
+                conn.execute("""
+                    INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
+                    VALUES (?,?,?,?,?,?,?,?,?)
+                """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), dt.year))
                 conn.commit()
-                flash(f"{repeat_months} recurring expense records created.", "success")
-        else:
-            exp_date = request.form.get("date", date.today().isoformat())
-            dt = datetime.strptime(exp_date, "%Y-%m-%d")
-            uid = generate_uid("EXP")
-            conn.execute("""
-                INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
-                VALUES (?,?,?,?,?,?,?,?,?)
-            """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), dt.year))
-            conn.commit()
-            flash("Expense recorded.", "success")
-
-        conn.close()
+                flash("Expense recorded.", "success")
+        finally:
+            conn.close()
         return redirect(url_for("expenses", tab="expenses", year=date.today().year))
 
     # ── GET ────────────────────────────────────────────────────────────────────
