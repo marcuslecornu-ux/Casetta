@@ -4,23 +4,57 @@
 {% block content %}
 <div class="section-title"><i class="bi bi-receipt me-2"></i>Expenses</div>
 
+<!-- Tab nav -->
+<ul class="nav nav-tabs mb-4">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'expenses' %}active{% endif %}"
+       href="{{ url_for('expenses', tab='expenses', year=year_filter) }}">
+      <i class="bi bi-list-ul me-1"></i>Expenses
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'reports' %}active{% endif %}"
+       href="{{ url_for('expenses', tab='reports', year=year_filter) }}">
+      <i class="bi bi-bar-chart me-1"></i>Reports
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'maintenance' %}active{% endif %}"
+       href="{{ url_for('expenses', tab='maintenance') }}">
+      <i class="bi bi-gear me-1"></i>Maintenance
+    </a>
+  </li>
+</ul>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat == 'success' else 'warning' }} alert-dismissible py-2 small">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<!-- ══════════════════ EXPENSES TAB ══════════════════ -->
+{% if tab == 'expenses' %}
 <div class="row g-4">
 
-  <!-- Entry Form -->
+  <!-- Add form -->
   <div class="col-lg-4">
     <div class="card">
       <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Add Expense</div>
       <div class="card-body">
-        <form method="POST">
+        <form method="POST" action="{{ url_for('expenses') }}">
+          <input type="hidden" name="is_recurring" id="is-recurring" value="0">
 
-          <div class="mb-3">
+          <div id="date-field" class="mb-2">
             <label class="form-label">Date</label>
-            <input type="date" name="date" class="form-control" value="{{ today }}" required>
+            <input type="date" name="date" class="form-control form-control-sm" value="{{ today }}" required>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-2">
             <label class="form-label">Category</label>
-            <select name="category" class="form-select" required>
+            <select name="category" class="form-select form-select-sm" id="add-category"
+                    onchange="loadSuppliers(this.value,'add-sub-list')" required>
               <option value="">— Select —</option>
               {% for c in categories %}
               <option value="{{ c }}">{{ c }}</option>
@@ -28,107 +62,134 @@
             </select>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-2">
             <label class="form-label">Sub-category / Supplier</label>
-            <input type="text" name="sub_category" class="form-control" placeholder="e.g. Agriturismo Insurance">
+            <input type="text" name="sub_category" class="form-control form-control-sm"
+                   list="add-sub-list" autocomplete="off" placeholder="Type or select…">
+            <datalist id="add-sub-list"></datalist>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-2">
             <label class="form-label">Comments</label>
-            <input type="text" name="comments" class="form-control" placeholder="Invoice ref, notes...">
+            <input type="text" name="comments" class="form-control form-control-sm" placeholder="Invoice ref, notes…">
           </div>
 
-          <div class="mb-3">
+          <div class="mb-2">
             <label class="form-label">Amount (€)</label>
-            <div class="input-group">
+            <div class="input-group input-group-sm">
               <span class="input-group-text">€</span>
               <input type="number" name="amount" class="form-control" step="0.01" min="0" required>
             </div>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-2">
             <label class="form-label">Status</label>
             <div class="d-flex gap-3">
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="status" value="Paid" id="statusPaid" checked>
-                <label class="form-check-label" for="statusPaid">Paid</label>
+                <input class="form-check-input" type="radio" name="status" value="Paid" id="sPaid" checked>
+                <label class="form-check-label" for="sPaid">Paid</label>
               </div>
               <div class="form-check">
-                <input class="form-check-input" type="radio" name="status" value="Forecast" id="statusForecast">
-                <label class="form-check-label" for="statusForecast">Forecast</label>
+                <input class="form-check-input" type="radio" name="status" value="Forecast" id="sForecast">
+                <label class="form-check-label" for="sForecast">Forecast</label>
               </div>
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-check-circle me-2"></i>Save Expense
+          <!-- Recurring toggle -->
+          <div class="mb-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="recurring-toggle"
+                     onchange="toggleRecurring(this)">
+              <label class="form-check-label" for="recurring-toggle">
+                <i class="bi bi-arrow-repeat me-1"></i>Recurring expense
+              </label>
+            </div>
+          </div>
+
+          <div id="recurring-fields" class="d-none border rounded p-2 mb-2 bg-light">
+            <div class="mb-2">
+              <label class="form-label">Start Month</label>
+              <input type="month" name="start_month" id="start-month" class="form-control form-control-sm">
+            </div>
+            <div class="mb-0">
+              <label class="form-label">Number of months</label>
+              <input type="number" name="repeat_months" class="form-control form-control-sm"
+                     min="1" max="24" value="12">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">
+            <i class="bi bi-check-circle me-1"></i>Save Expense
           </button>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- Right side: totals + list -->
+  <!-- Expense list -->
   <div class="col-lg-8">
-
     <!-- Year filter -->
-    <div class="d-flex align-items-center gap-2 mb-3">
-      <span class="fw-bold">Year:</span>
+    <div class="d-flex align-items-center gap-1 flex-wrap mb-3">
+      <span class="fw-bold me-1 small">Year:</span>
       {% for y in years %}
-      <a href="/expenses?year={{ y }}" class="btn btn-sm {{ 'btn-primary' if y == year_filter else 'btn-outline-primary' }}">{{ y }}</a>
+      <a href="{{ url_for('expenses', tab='expenses', year=y) }}"
+         class="btn btn-sm {{ 'btn-primary' if y|string == year_filter|string else 'btn-outline-primary' }}">
+         {{ y }}
+      </a>
       {% endfor %}
     </div>
 
-    <!-- Category totals -->
-    {% if totals %}
-    <div class="card mb-4">
-      <div class="card-header">Totals by Category — {{ year_filter }}</div>
-      <div class="card-body p-0">
-        <table class="table table-sm mb-0">
-          <thead><tr><th>Category</th><th class="text-end">Total (€)</th></tr></thead>
-          <tbody>
-            {% set grand = namespace(total=0) %}
-            {% for t in totals %}
-            {% set grand.total = grand.total + t.total %}
-            <tr>
-              <td>{{ t.category }}</td>
-              <td class="text-end fw-bold">€{{ "%.2f"|format(t.total) }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr class="table-dark">
-              <td class="fw-bold">TOTAL</td>
-              <td class="text-end fw-bold">€{{ "%.2f"|format(grand.total) }}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+    <!-- Search -->
+    <div class="mb-2">
+      <input type="text" id="exp-search" class="form-control form-control-sm"
+             placeholder="Search expenses…" oninput="filterExp()">
     </div>
-    {% endif %}
 
-    <!-- Expense list -->
     <div class="card">
-      <div class="card-header">All Expenses — {{ year_filter }}</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>All Expenses — {{ year_filter }}</span>
+        <span class="badge bg-secondary" id="exp-count">{{ all_expenses|length }}</span>
+      </div>
       <div class="card-body p-0">
-        <table class="table table-sm table-hover mb-0">
-          <thead>
+        <div style="max-height:65vh;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0" id="exp-table">
+          <thead class="sticky-top bg-white">
             <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Sub-category</th>
-              <th>Comments</th>
-              <th>Status</th>
-              <th class="text-end">Amount €</th>
+              <th onclick="sortExp('date')" style="cursor:pointer;white-space:nowrap">
+                Date <span class="sort-icon" data-col="date">⇅</span>
+              </th>
+              <th onclick="sortExp('category')" style="cursor:pointer">
+                Category <span class="sort-icon" data-col="category">⇅</span>
+              </th>
+              <th onclick="sortExp('sub')" style="cursor:pointer">
+                Supplier <span class="sort-icon" data-col="sub">⇅</span>
+              </th>
+              <th onclick="sortExp('comments')" style="cursor:pointer">
+                Comments <span class="sort-icon" data-col="comments">⇅</span>
+              </th>
+              <th onclick="sortExp('status')" style="cursor:pointer;white-space:nowrap">
+                Status <span class="sort-icon" data-col="status">⇅</span>
+              </th>
+              <th onclick="sortExp('amount')" style="cursor:pointer;text-align:right;white-space:nowrap">
+                Amount € <span class="sort-icon" data-col="amount">⇅</span>
+              </th>
             </tr>
           </thead>
-          <tbody>
-            {% for e in recent %}
-            <tr>
-              <td><small>{{ e.date }}</small></td>
+          <tbody id="exp-tbody">
+            {% for e in all_expenses %}
+            <tr ondblclick="openEditExp(this)" style="cursor:pointer"
+                data-uid="{{ e.uid }}"
+                data-date="{{ e.date }}"
+                data-category="{{ e.category }}"
+                data-sub="{{ e.sub_category or '' }}"
+                data-comments="{{ e.comments or '' }}"
+                data-amount="{{ e.amount }}"
+                data-status="{{ e.status }}">
+              <td><small>{{ e.date[8:10] }}-{{ e.date[5:7] }}-{{ e.date[0:4] }}</small></td>
               <td><small>{{ e.category }}</small></td>
               <td><small>{{ e.sub_category or '—' }}</small></td>
-              <td><small>{{ e.comments or '—' }}</small></td>
+              <td><small>{{ e.comments or '' }}</small></td>
               <td>
                 <span class="badge {{ 'bg-success' if e.status == 'Paid' else 'bg-warning text-dark' }}">
                   {{ e.status }}
@@ -141,9 +202,323 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════ REPORTS TAB ══════════════════ -->
+{% elif tab == 'reports' %}
+
+<!-- Year filter -->
+<div class="d-flex align-items-center gap-1 flex-wrap mb-4">
+  <span class="fw-bold me-1 small">Year:</span>
+  {% for y in years %}
+  <a href="{{ url_for('expenses', tab='reports', year=y) }}"
+     class="btn btn-sm {{ 'btn-primary' if y|string == year_filter|string else 'btn-outline-primary' }}">
+     {{ y }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="row g-4">
+  <!-- Category totals -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Totals by Category — {{ year_filter }}</div>
+      <div class="card-body p-0">
+        {% set grand = namespace(total=0) %}
+        {% for t in totals %}{% set grand.total = grand.total + t.total %}{% endfor %}
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th class="text-end">Count</th>
+              <th class="text-end">Total €</th>
+              <th class="text-end">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in totals %}
+            <tr>
+              <td><small>{{ t.category }}</small></td>
+              <td class="text-end"><small>{{ t.cnt }}</small></td>
+              <td class="text-end fw-bold">€{{ "%.2f"|format(t.total) }}</td>
+              <td class="text-end text-muted"><small>
+                {% if grand.total > 0 %}{{ "%.1f"|format(t.total / grand.total * 100) }}%{% endif %}
+              </small></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-dark">
+              <td class="fw-bold">TOTAL</td>
+              <td class="text-end fw-bold">{{ all_expenses|length }}</td>
+              <td class="text-end fw-bold">€{{ "%.2f"|format(grand.total) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   </div>
 
+  <!-- Monthly breakdown -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Monthly Breakdown — {{ year_filter }}</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th class="text-end">Total €</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in monthly %}
+            <tr>
+              <td>{{ m[0] }}</td>
+              <td class="text-end fw-bold">€{{ "%.2f"|format(m.total) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center text-muted py-3">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
+
+
+<!-- ══════════════════ MAINTENANCE TAB ══════════════════ -->
+{% elif tab == 'maintenance' %}
+
+<div class="row g-4">
+  <div class="col-lg-3">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-funnel me-2"></i>Category</div>
+      <div class="card-body p-2">
+        <div class="list-group list-group-flush">
+          {% for c in categories %}
+          <button type="button"
+                  class="list-group-item list-group-item-action py-1 px-2 small maint-cat-btn"
+                  data-cat="{{ c }}"
+                  onclick="filterSuppliers('{{ c }}')">
+            {{ c }}
+            <span class="badge bg-secondary float-end">{{ suppliers_by_cat.get(c, [])|length }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-9">
+    {% for c in categories %}
+    <div class="supplier-section card mb-3" data-cat="{{ c }}" style="display:none">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-tag me-2"></i>{{ c }}</span>
+        <span class="badge bg-secondary">{{ suppliers_by_cat.get(c, [])|length }} suppliers</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for s in suppliers_by_cat.get(c, []) %}
+            <tr>
+              <td>{{ s.name }}</td>
+              <td style="width:80px">
+                <form method="POST" action="/expenses/suppliers/delete/{{ s.id }}"
+                      onsubmit="return confirm('Remove {{ s.name }}?')">
+                  <button class="btn btn-sm btn-outline-danger py-0 px-2">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td class="text-muted small py-2">No suppliers yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer py-2">
+        <form method="POST" action="/expenses/suppliers/add" class="d-flex gap-2">
+          <input type="hidden" name="category" value="{{ c }}">
+          <input type="text" name="name" class="form-control form-control-sm"
+                 placeholder="New supplier name…" required>
+          <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+            <i class="bi bi-plus"></i> Add
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div id="maint-placeholder" class="text-center text-muted py-5">
+      <i class="bi bi-arrow-left-circle fs-3 d-block mb-2"></i>
+      Select a category to view and manage its suppliers
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════ EDIT MODAL ══════════════════ -->
+<div class="modal fade" id="editExpModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Expense</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editExpForm" action="">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" name="date" id="edit-date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select name="category" id="edit-category" class="form-select"
+                    onchange="loadSuppliers(this.value,'edit-sub-list')">
+              <option value="">— Select —</option>
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sub-category / Supplier</label>
+            <input type="text" name="sub_category" id="edit-sub" class="form-control"
+                   list="edit-sub-list" autocomplete="off">
+            <datalist id="edit-sub-list"></datalist>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Comments</label>
+            <input type="text" name="comments" id="edit-comments" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount (€)</label>
+            <div class="input-group">
+              <span class="input-group-text">€</span>
+              <input type="number" name="amount" id="edit-amount" class="form-control" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select name="status" id="edit-status" class="form-select">
+              <option value="Paid">Paid</option>
+              <option value="Forecast">Forecast</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ── Supplier data from server ────────────────────────
+const allSuppliers = {{ suppliers_by_cat | tojson }};
+
+function loadSuppliers(category, listId) {
+  const dl = document.getElementById(listId);
+  if (!dl) return;
+  dl.innerHTML = '';
+  (allSuppliers[category] || []).forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.name;
+    dl.appendChild(opt);
+  });
+}
+
+// ── Recurring toggle ─────────────────────────────────
+function toggleRecurring(cb) {
+  const on = cb.checked;
+  document.getElementById('is-recurring').value = on ? '1' : '0';
+  document.getElementById('recurring-fields').classList.toggle('d-none', !on);
+  document.getElementById('date-field').classList.toggle('d-none', on);
+  if (on) {
+    const now = new Date();
+    document.getElementById('start-month').value =
+      `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+}
+
+// ── Edit modal ───────────────────────────────────────
+function openEditExp(row) {
+  document.getElementById('editExpForm').action = '/expenses/edit/' + row.dataset.uid;
+  document.getElementById('edit-date').value     = row.dataset.date;
+  document.getElementById('edit-category').value = row.dataset.category;
+  loadSuppliers(row.dataset.category, 'edit-sub-list');
+  document.getElementById('edit-sub').value      = row.dataset.sub || '';
+  document.getElementById('edit-comments').value = row.dataset.comments || '';
+  document.getElementById('edit-amount').value   = row.dataset.amount;
+  document.getElementById('edit-status').value   = row.dataset.status;
+  new bootstrap.Modal(document.getElementById('editExpModal')).show();
+}
+
+// ── Table sort ───────────────────────────────────────
+const expSortDir = {};
+function sortExp(col) {
+  const tbody = document.getElementById('exp-tbody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.rows);
+  const dir = expSortDir[col] === 'asc' ? 'desc' : 'asc';
+  expSortDir[col] = dir;
+  rows.sort((a, b) => {
+    let av = a.dataset[col] || '', bv = b.dataset[col] || '';
+    if (col === 'amount') { av = parseFloat(av)||0; bv = parseFloat(bv)||0; return dir==='asc'?av-bv:bv-av; }
+    return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  document.querySelectorAll('.sort-icon').forEach(el => {
+    el.textContent = el.dataset.col === col ? (dir==='asc'?'▲':'▼') : '⇅';
+  });
+}
+
+// ── Search filter ────────────────────────────────────
+function filterExp() {
+  const q = document.getElementById('exp-search')?.value.toLowerCase() || '';
+  const rows = document.querySelectorAll('#exp-tbody tr');
+  let visible = 0;
+  rows.forEach(r => {
+    const match = r.textContent.toLowerCase().includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const cnt = document.getElementById('exp-count');
+  if (cnt) cnt.textContent = visible;
+}
+
+// ── Maintenance category filter ───────────────────────
+function filterSuppliers(cat) {
+  document.querySelectorAll('.supplier-section').forEach(s => {
+    s.style.display = s.dataset.cat === cat ? 'block' : 'none';
+  });
+  document.querySelectorAll('.maint-cat-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.cat === cat);
+  });
+  const placeholder = document.getElementById('maint-placeholder');
+  if (placeholder) placeholder.style.display = 'none';
+}
+
+// Auto-activate maintenance category from URL
+(function() {
+  const params = new URLSearchParams(location.search);
+  const cat = params.get('cat');
+  if (cat) filterSuppliers(cat);
+})();
+</script>
 {% endblock %}

@@ -419,49 +419,161 @@ def delete_stock_item(item_id):
 def expenses():
     if request.method == "POST":
         conn = get_db()
-        exp_date = request.form.get("date", date.today().isoformat())
-        dt = datetime.strptime(exp_date, "%Y-%m-%d")
+        category    = request.form.get("category")
+        sub_cat     = request.form.get("sub_category", "")
+        comments    = request.form.get("comments", "")
+        amount      = float(request.form.get("amount", 0))
+        status      = request.form.get("status", "Paid")
+        is_recurring = request.form.get("is_recurring") == "1"
 
-        uid = generate_uid("EXP")
-        conn.execute("""
-            INSERT INTO expenses (uid, date, category, sub_category, comments, amount, status, month, year)
-            VALUES (?,?,?,?,?,?,?,?,?)
-        """, (uid, exp_date,
-              request.form.get("category"),
-              request.form.get("sub_category", ""),
-              request.form.get("comments", ""),
-              float(request.form.get("amount", 0)),
-              request.form.get("status", "Paid"),
-              dt.strftime("%b"), dt.year))
-        conn.commit()
+        if is_recurring:
+            start_month   = request.form.get("start_month", "")   # "2025-01"
+            repeat_months = int(request.form.get("repeat_months", 1) or 1)
+            if start_month and len(start_month) >= 7:
+                y, m = int(start_month[:4]), int(start_month[5:7])
+                for i in range(repeat_months):
+                    cm = m + i
+                    cy = y + (cm - 1) // 12
+                    cm = ((cm - 1) % 12) + 1
+                    exp_date = f"{cy:04d}-{cm:02d}-01"
+                    dt = datetime.strptime(exp_date, "%Y-%m-%d")
+                    uid = generate_uid("EXP")
+                    conn.execute("""
+                        INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
+                        VALUES (?,?,?,?,?,?,?,?,?)
+                    """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), cy))
+                conn.commit()
+                flash(f"{repeat_months} recurring expense records created.", "success")
+        else:
+            exp_date = request.form.get("date", date.today().isoformat())
+            dt = datetime.strptime(exp_date, "%Y-%m-%d")
+            uid = generate_uid("EXP")
+            conn.execute("""
+                INSERT INTO expenses (uid,date,category,sub_category,comments,amount,status,month,year)
+                VALUES (?,?,?,?,?,?,?,?,?)
+            """, (uid, exp_date, category, sub_cat, comments, amount, status, dt.strftime("%b"), dt.year))
+            conn.commit()
+            flash("Expense recorded.", "success")
+
         conn.close()
-        flash("Expense recorded.", "success")
-        return redirect(url_for("expenses"))
+        return redirect(url_for("expenses", tab="expenses", year=date.today().year))
+
+    # ── GET ────────────────────────────────────────────────────────────────────
+    tab        = request.args.get("tab", "expenses")
+    year_filter = request.args.get("year", str(date.today().year))
+    cat_filter  = request.args.get("cat", "")
 
     conn = get_db()
-    # Filter by year
-    year_filter = request.args.get("year", str(date.today().year))
-    recent = conn.execute(
-        "SELECT * FROM expenses WHERE year=? ORDER BY date DESC",
-        (year_filter,)
-    ).fetchall()
-    totals = conn.execute(
-        "SELECT category, SUM(amount) as total FROM expenses WHERE year=? GROUP BY category ORDER BY total DESC",
-        (year_filter,)
-    ).fetchall()
-    years = conn.execute(
-        "SELECT DISTINCT year FROM expenses ORDER BY year DESC"
+
+    if year_filter == "all":
+        all_expenses = conn.execute("SELECT * FROM expenses ORDER BY date DESC").fetchall()
+        totals = conn.execute(
+            "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses GROUP BY category ORDER BY total DESC"
+        ).fetchall()
+        monthly = conn.execute(
+            "SELECT year||'-'||month AS ym, SUM(amount) as total FROM expenses GROUP BY year, month ORDER BY year DESC, date DESC"
+        ).fetchall()
+    else:
+        all_expenses = conn.execute(
+            "SELECT * FROM expenses WHERE year=? ORDER BY date DESC", (year_filter,)
+        ).fetchall()
+        totals = conn.execute(
+            "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses WHERE year=? GROUP BY category ORDER BY total DESC",
+            (year_filter,)
+        ).fetchall()
+        monthly = conn.execute(
+            """SELECT month, SUM(amount) as total FROM expenses WHERE year=?
+               GROUP BY month ORDER BY
+               CASE month WHEN 'Jan' THEN 1 WHEN 'Feb' THEN 2 WHEN 'Mar' THEN 3
+               WHEN 'Apr' THEN 4 WHEN 'May' THEN 5 WHEN 'Jun' THEN 6
+               WHEN 'Jul' THEN 7 WHEN 'Aug' THEN 8 WHEN 'Sep' THEN 9
+               WHEN 'Oct' THEN 10 WHEN 'Nov' THEN 11 WHEN 'Dec' THEN 12 END""",
+            (year_filter,)
+        ).fetchall()
+
+    years = conn.execute("SELECT DISTINCT year FROM expenses ORDER BY year DESC").fetchall()
+
+    sup_rows = conn.execute(
+        "SELECT id, category, name FROM expense_suppliers WHERE active=1 ORDER BY category, name"
     ).fetchall()
     conn.close()
 
+    suppliers_by_cat = {}
+    for row in sup_rows:
+        suppliers_by_cat.setdefault(row["category"], []).append({"id": row["id"], "name": row["name"]})
+
     return render_template("expenses.html",
+        tab=tab,
         categories=EXPENSE_CATEGORIES,
-        recent=recent,
+        all_expenses=all_expenses,
         totals=totals,
-        years=[r["year"] for r in years] or [date.today().year],
-        year_filter=int(year_filter),
-        today=date.today().isoformat()
+        monthly=monthly,
+        years=["all"] + [r["year"] for r in years],
+        year_filter=year_filter,
+        today=date.today().isoformat(),
+        suppliers_by_cat=suppliers_by_cat,
+        cat_filter=cat_filter,
     )
+
+
+@app.route("/expenses/edit/<uid>", methods=["POST"])
+@login_required
+def edit_expense(uid):
+    exp_date = request.form.get("date")
+    dt = datetime.strptime(exp_date, "%Y-%m-%d")
+    conn = get_db()
+    conn.execute("""
+        UPDATE expenses SET date=?,category=?,sub_category=?,comments=?,amount=?,status=?,month=?,year=?
+        WHERE uid=?
+    """, (exp_date, request.form.get("category"), request.form.get("sub_category",""),
+          request.form.get("comments",""), float(request.form.get("amount",0)),
+          request.form.get("status","Paid"), dt.strftime("%b"), dt.year, uid))
+    conn.commit()
+    conn.close()
+    flash("Expense updated.", "success")
+    return redirect(url_for("expenses", tab="expenses", year=dt.year))
+
+
+@app.route("/api/expense_suppliers/<path:category>")
+@login_required
+def api_expense_suppliers(category):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT name FROM expense_suppliers WHERE category=? AND active=1 ORDER BY name",
+        (category,)
+    ).fetchall()
+    conn.close()
+    return jsonify([r["name"] for r in rows])
+
+
+@app.route("/expenses/suppliers/add", methods=["POST"])
+@login_required
+def add_expense_supplier():
+    category = request.form.get("category","").strip()
+    name     = request.form.get("name","").strip()
+    if category and name:
+        conn = get_db()
+        try:
+            conn.execute("INSERT OR IGNORE INTO expense_suppliers (category,name) VALUES (?,?)", (category, name))
+            conn.commit()
+        except Exception:
+            pass
+        conn.close()
+        flash(f"Added '{name}'.", "success")
+    return redirect(url_for("expenses", tab="maintenance", cat=category))
+
+
+@app.route("/expenses/suppliers/delete/<int:supplier_id>", methods=["POST"])
+@login_required
+def delete_expense_supplier(supplier_id):
+    conn = get_db()
+    row = conn.execute("SELECT category FROM expense_suppliers WHERE id=?", (supplier_id,)).fetchone()
+    category = row["category"] if row else ""
+    conn.execute("DELETE FROM expense_suppliers WHERE id=?", (supplier_id,))
+    conn.commit()
+    conn.close()
+    flash("Supplier removed.", "success")
+    return redirect(url_for("expenses", tab="maintenance", cat=category))
 
 
 # ─── BOOKINGS ─────────────────────────────────────────────────────────────────
