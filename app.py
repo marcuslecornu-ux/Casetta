@@ -220,6 +220,45 @@ def sales():
     )
 
 
+@app.route("/sales/edit/<uid>", methods=["POST"])
+@login_required
+def edit_sale(uid):
+    conn = get_db()
+    unit_type  = request.form.get("unit_type", "Bottle")
+    is_hosted  = 1 if request.form.get("is_hosted") else 0
+    quantity   = int(request.form.get("quantity", 1))
+    unit_price = float(request.form.get("unit_price", 0))
+    discount_pct = float(request.form.get("discount_pct", 0))
+
+    if is_hosted:
+        total_sale   = 0
+        discount_pct = 100
+    else:
+        total_sale = unit_price * quantity * (1 - discount_pct / 100)
+
+    conn.execute("""
+        UPDATE drink_sales SET
+            date=?, room=?, item_id=?, item_name=?, category=?,
+            quantity=?, unit_type=?, unit_price=?, discount_pct=?,
+            is_hosted=?, total_sale=?, notes=?
+        WHERE uid=?
+    """, (
+        request.form.get("date"),
+        request.form.get("room"),
+        request.form.get("item_id", ""),
+        request.form.get("item_name"),
+        request.form.get("category"),
+        quantity, unit_type, unit_price, discount_pct,
+        is_hosted, total_sale,
+        request.form.get("notes", ""),
+        uid
+    ))
+    conn.commit()
+    conn.close()
+    flash("Sale updated.", "success")
+    return redirect(url_for("sales"))
+
+
 @app.route("/api/next_code/<category>")
 @login_required
 def next_code(category):

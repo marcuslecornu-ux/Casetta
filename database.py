@@ -4,8 +4,7 @@ from werkzeug.security import generate_password_hash
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "casetta.db")
 
-ROOMS = ["Menta", "Lavanda", "Salvia", "Prezzemolo", "Cantina",
-         "Casetta - WH", "Xenia - Hosting", "Angela - Hosting", "Slippage", "Events"]
+ROOMS = ["Whole House", "Angela Hosting", "Xenia Hosting", "Slippage", "Events"]
 
 PROPERTIES = ["Casetta", "Folegandros"]
 CASETTA_ROOMS = ["Whole House", "Cantina", "Lavanda", "Menta", "Prezzemolo", "Salvia"]
