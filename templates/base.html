@@ -30,17 +30,15 @@
       background: var(--casetta-brown);
       position: fixed; top: 0; left: 0; z-index: 100;
       display: flex; flex-direction: column;
+      transition: width 0.22s ease;
+      overflow: hidden;
     }
 
     .sidebar .brand {
       padding: 1.4rem 1rem 1.2rem;
       border-bottom: 1px solid rgba(255,255,255,0.12);
       text-align: center;
-    }
-
-    .sidebar .brand img {
-      width: 120px;
-      opacity: .95;
+      white-space: nowrap;
     }
 
     .sidebar .nav-link {
@@ -49,6 +47,7 @@
       display: flex; align-items: center; gap: .6rem;
       font-size: .88rem; letter-spacing: .03em; text-transform: uppercase;
       font-family: 'Lato', sans-serif; font-weight: 400;
+      white-space: nowrap;
     }
 
     .sidebar .nav-link:hover, .sidebar .nav-link.active {
@@ -66,8 +65,43 @@
       padding: .8rem 0;
     }
 
+    .nav-label { transition: opacity 0.15s ease; }
+
+    /* ── Sidebar toggle tab ── */
+    #sidebar-toggle {
+      position: fixed;
+      top: 50%;
+      left: 219px;
+      transform: translateY(-50%);
+      z-index: 200;
+      background: var(--casetta-brown);
+      border: 1px solid var(--casetta-gold);
+      border-left: none;
+      color: var(--casetta-gold);
+      width: 16px; height: 44px;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      transition: left 0.22s ease;
+      padding: 0;
+    }
+    #sidebar-toggle:hover { background: var(--casetta-brown2); }
+    #sidebar-toggle i { transition: transform 0.22s ease; }
+
+    /* ── Collapsed state ── */
+    body.sb-collapsed .sidebar { width: 52px; }
+    body.sb-collapsed .main-content { margin-left: 52px; }
+    body.sb-collapsed #sidebar-toggle { left: 51px; }
+    body.sb-collapsed #sidebar-toggle i { transform: rotate(180deg); }
+    body.sb-collapsed .nav-label { opacity: 0; width: 0; overflow: hidden; }
+    body.sb-collapsed .sidebar .nav-link { padding: .55rem 0; justify-content: center; gap: 0; }
+    body.sb-collapsed .sidebar .nav-link.active { border-left: 3px solid var(--casetta-cream); }
+    body.sb-collapsed .sidebar .brand { padding: .8rem 0; }
+    body.sb-collapsed .user-name { display: none; }
+
     /* ── Main ── */
-    .main-content { margin-left: 220px; padding: 2rem; }
+    .main-content { margin-left: 220px; padding: 2rem; transition: margin-left 0.22s ease; }
 
     .section-title {
       font-family: 'Cormorant Garamond', serif;
@@ -113,6 +147,11 @@
 </head>
 <body>
 
+<!-- Sidebar toggle tab -->
+<button id="sidebar-toggle" onclick="toggleSidebar()" title="Collapse/expand menu">
+  <i class="bi bi-chevron-left"></i>
+</button>
+
 <div class="sidebar">
   <div class="brand">
     <a href="/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="130" height="143">
@@ -129,32 +168,32 @@
   </div>
   <nav class="nav flex-column mt-2">
     <a href="/" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
-      <i class="bi bi-grid"></i> Dashboard
+      <i class="bi bi-grid"></i><span class="nav-label"> Dashboard</span>
     </a>
     <a href="/sales" class="nav-link {% if request.endpoint == 'sales' %}active{% endif %}">
-      <i class="bi bi-cup-straw"></i> Drink Sales
+      <i class="bi bi-cup-straw"></i><span class="nav-label"> Drink Sales</span>
     </a>
     <a href="/stock" class="nav-link {% if request.endpoint == 'stock' %}active{% endif %}">
-      <i class="bi bi-box-seam"></i> Stock
+      <i class="bi bi-box-seam"></i><span class="nav-label"> Stock</span>
     </a>
     <a href="/expenses" class="nav-link {% if request.endpoint == 'expenses' %}active{% endif %}">
-      <i class="bi bi-receipt"></i> Expenses
+      <i class="bi bi-receipt"></i><span class="nav-label"> Expenses</span>
     </a>
     <a href="/bookings" class="nav-link {% if request.endpoint == 'bookings' %}active{% endif %}">
-      <i class="bi bi-calendar-check"></i> Bookings
+      <i class="bi bi-calendar-check"></i><span class="nav-label"> Bookings</span>
     </a>
     {% if current_user.is_admin %}
     <a href="/admin" class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
-      <i class="bi bi-shield-check"></i> Admin
+      <i class="bi bi-shield-check"></i><span class="nav-label"> Admin</span>
     </a>
     {% endif %}
   </nav>
   <div class="sidebar-bottom">
-    <div style="padding: .3rem 1.2rem; color:rgba(255,255,255,.5); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em;">
+    <div class="user-name" style="padding: .3rem 1.2rem; color:rgba(255,255,255,.5); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em;">
       {{ current_user.display_name }}
     </div>
     <a href="/logout" class="nav-link" style="color:rgba(255,255,255,.5); font-size:.82rem;">
-      <i class="bi bi-box-arrow-left"></i> Log out
+      <i class="bi bi-box-arrow-left"></i><span class="nav-label"> Log out</span>
     </a>
   </div>
 </div>
@@ -174,5 +213,18 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 {% block scripts %}{% endblock %}
+<script>
+  // Sidebar collapse — persisted in localStorage
+  (function() {
+    if (localStorage.getItem('sb') === '1') {
+      document.body.classList.add('sb-collapsed');
+    }
+  })();
+
+  function toggleSidebar() {
+    const collapsed = document.body.classList.toggle('sb-collapsed');
+    localStorage.setItem('sb', collapsed ? '1' : '0');
+  }
+</script>
 </body>
 </html>
