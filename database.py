@@ -7,6 +7,9 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "casetta.db")
 ROOMS = ["Menta", "Lavanda", "Salvia", "Prezzemolo", "Cantina",
          "Casetta - WH", "Xenia - Hosting", "Angela - Hosting", "Slippage", "Events"]
 
+PROPERTIES = ["Casetta", "Folegandros"]
+CASETTA_ROOMS = ["Whole House", "Cantina", "Lavanda", "Menta", "Prezzemolo", "Salvia"]
+
 DRINK_CATEGORIES = ["Beer", "Cocktail", "Digestivo", "Hot drinks", "Red", "Red (T)",
                     "Rose", "Soft drink", "Sparkling", "Spirit", "White", "White (T)"]
 
@@ -200,6 +203,18 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS booking_rates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            property TEXT NOT NULL,
+            room TEXT,
+            source TEXT,
+            date_from TEXT NOT NULL,
+            date_to TEXT NOT NULL,
+            rate_per_night REAL NOT NULL,
+            notes TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -208,6 +223,18 @@ def init_db():
             display_name TEXT
         );
     """)
+
+    # Migration: add property column to bookings if not exists
+    try:
+        c.execute("ALTER TABLE bookings ADD COLUMN property TEXT")
+        c.execute("""
+            UPDATE bookings SET property =
+            CASE WHEN upper(room) LIKE '%FOL%' THEN 'Folegandros' ELSE 'Casetta' END
+            WHERE property IS NULL OR property = ''
+        """)
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
 
     # Seed stock items if empty
     count = c.execute("SELECT COUNT(*) FROM stock_items").fetchone()[0]

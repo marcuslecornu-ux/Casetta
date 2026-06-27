@@ -6,7 +6,7 @@ import os
 import csv
 import io
 from datetime import datetime, date
-from database import get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES, BOOKING_SOURCES
+from database import get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES, BOOKING_SOURCES, CASETTA_ROOMS, PROPERTIES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "casetta-secret-2026-change-in-production")
@@ -37,6 +37,32 @@ def load_user(user_id):
     if row:
         return User(row["id"], row["username"], row["role"], row["display_name"])
     return None
+
+
+def check_double_booking(conn, property_name, room, arrival, departure, exclude_id=None):
+    """Return list of conflicting confirmed/provisional bookings."""
+    query = """
+        SELECT * FROM bookings
+        WHERE confirmed != 'CXL' AND arrival < ? AND departure > ?
+    """
+    params = [departure, arrival]
+    if exclude_id:
+        query += " AND id != ?"
+        params.append(exclude_id)
+    existing = conn.execute(query, params).fetchall()
+    conflicts = []
+    for b in existing:
+        b_prop = b["property"] or "Casetta"
+        b_room = b["room"]
+        if property_name == "Folegandros":
+            if b_prop == "Folegandros":
+                conflicts.append(b)
+        elif property_name == "Casetta":
+            if b_prop == "Casetta":
+                # Whole house conflicts with everything; individual rooms only conflict with whole house
+                if room == "Whole House" or b_room == "Whole House":
+                    conflicts.append(b)
+    return conflicts
 
 
 def generate_uid(prefix=""):
@@ -353,25 +379,33 @@ def expenses():
 @app.route("/bookings", methods=["GET", "POST"])
 @login_required
 def bookings():
+    from datetime import timedelta
     if request.method == "POST":
         conn = get_db()
         arrival = request.form.get("arrival")
         num_nights = int(request.form.get("num_nights", 1))
+        property_name = request.form.get("property", "Casetta")
+        room = request.form.get("room", "Whole House")
 
-        # Calculate departure
         arr_dt = datetime.strptime(arrival, "%Y-%m-%d")
-        from datetime import timedelta
         dep_dt = arr_dt + timedelta(days=num_nights)
         departure = dep_dt.date().isoformat()
 
+        conflicts = check_double_booking(conn, property_name, room, arrival, departure)
+        if conflicts:
+            names = ", ".join(c["guest_name"] for c in conflicts)
+            flash(f"⚠ Double booking conflict with: {names}. Dates overlap an existing booking.", "warning")
+            conn.close()
+            return redirect(url_for("bookings"))
+
         conn.execute("""
             INSERT INTO bookings
-            (entry_date, guest_name, room, arrival, num_nights, departure,
+            (entry_date, guest_name, property, room, arrival, num_nights, departure,
              source, source_code, confirmed, rate_type, total_cost, notes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (date.today().isoformat(),
               request.form.get("guest_name"),
-              request.form.get("room"),
+              property_name, room,
               arrival, num_nights, departure,
               request.form.get("source"),
               request.form.get("source_code"),
@@ -381,24 +415,101 @@ def bookings():
               request.form.get("notes", "")))
         conn.commit()
         conn.close()
-        flash("Booking recorded.", "success")
+        flash("Booking saved.", "success")
         return redirect(url_for("bookings"))
 
     conn = get_db()
     year_filter = request.args.get("year", str(date.today().year))
+    tab = request.args.get("tab", "")
     all_bookings = conn.execute(
         "SELECT * FROM bookings WHERE arrival LIKE ? ORDER BY arrival",
         (f"{year_filter}%",)
     ).fetchall()
+    rates = conn.execute(
+        "SELECT * FROM booking_rates ORDER BY property, date_from"
+    ).fetchall()
     conn.close()
 
     return render_template("bookings.html",
-        rooms=ROOMS,
         sources=BOOKING_SOURCES,
+        casetta_rooms=CASETTA_ROOMS,
         all_bookings=all_bookings,
+        booking_rates=rates,
         year_filter=int(year_filter),
+        tab=tab,
         today=date.today().isoformat()
     )
+
+
+@app.route("/bookings/edit/<int:booking_id>", methods=["POST"])
+@login_required
+def edit_booking(booking_id):
+    from datetime import timedelta
+    conn = get_db()
+    arrival = request.form.get("arrival")
+    num_nights = int(request.form.get("num_nights", 1))
+    property_name = request.form.get("property", "Casetta")
+    room = request.form.get("room", "Whole House")
+
+    arr_dt = datetime.strptime(arrival, "%Y-%m-%d")
+    dep_dt = arr_dt + timedelta(days=num_nights)
+    departure = dep_dt.date().isoformat()
+
+    conflicts = check_double_booking(conn, property_name, room, arrival, departure, exclude_id=booking_id)
+    if conflicts:
+        names = ", ".join(c["guest_name"] for c in conflicts)
+        flash(f"⚠ Double booking conflict with: {names}.", "warning")
+        conn.close()
+        return redirect(url_for("bookings"))
+
+    conn.execute("""
+        UPDATE bookings SET
+            guest_name=?, property=?, room=?, arrival=?, num_nights=?, departure=?,
+            source=?, source_code=?, confirmed=?, rate_type=?, total_cost=?, notes=?
+        WHERE id=?
+    """, (
+        request.form.get("guest_name"),
+        property_name, room, arrival, num_nights, departure,
+        request.form.get("source"),
+        request.form.get("source_code"),
+        request.form.get("confirmed", "Yes"),
+        request.form.get("rate_type", "RACK"),
+        float(request.form.get("total_cost", 0)),
+        request.form.get("notes", ""),
+        booking_id
+    ))
+    conn.commit()
+    conn.close()
+    flash("Booking updated.", "success")
+    return redirect(url_for("bookings"))
+
+
+@app.route("/bookings/rates", methods=["POST"])
+@login_required
+def manage_rates():
+    conn = get_db()
+    action = request.form.get("action")
+    if action == "add":
+        conn.execute("""
+            INSERT INTO booking_rates (property, room, source, date_from, date_to, rate_per_night, notes)
+            VALUES (?,?,?,?,?,?,?)
+        """, (
+            request.form.get("property"),
+            request.form.get("room", ""),
+            request.form.get("source", ""),
+            request.form.get("date_from"),
+            request.form.get("date_to"),
+            float(request.form.get("rate_per_night", 0)),
+            request.form.get("notes", "")
+        ))
+        conn.commit()
+        flash("Rate period added.", "success")
+    elif action == "delete":
+        conn.execute("DELETE FROM booking_rates WHERE id=?", (request.form.get("rate_id"),))
+        conn.commit()
+        flash("Rate deleted.", "success")
+    conn.close()
+    return redirect(url_for("bookings") + "?tab=rates")
 
 
 # ─── ADMIN ────────────────────────────────────────────────────────────────────

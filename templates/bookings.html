@@ -4,14 +4,22 @@
 {% block content %}
 <div class="section-title"><i class="bi bi-calendar-check me-2"></i>Accommodation Bookings</div>
 
+<!-- Year filter -->
+<div class="d-flex align-items-center gap-2 mb-3">
+  <span style="font-size:.8rem;font-weight:700;color:var(--casetta-brown2);text-transform:uppercase;letter-spacing:.05em">Year:</span>
+  {% for y in range(2022, 2028) %}
+  <a href="/bookings?year={{ y }}" class="btn btn-sm {{ 'btn-primary' if y == year_filter else 'btn-outline-primary' }}">{{ y }}</a>
+  {% endfor %}
+</div>
+
 <div class="row g-4">
 
-  <!-- Entry Form -->
+  <!-- ── Add Booking Form ───────────────────────────────────────── -->
   <div class="col-lg-4">
     <div class="card">
       <div class="card-header"><i class="bi bi-plus-circle me-2"></i>Add Booking</div>
       <div class="card-body">
-        <form method="POST">
+        <form method="POST" id="addForm">
 
           <div class="mb-3">
             <label class="form-label">Guest Name</label>
@@ -19,42 +27,47 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Room / Property</label>
-            <select name="room" class="form-select" required>
-              <option value="">— Select —</option>
-              {% for r in rooms %}
-              <option value="{{ r }}">{{ r }}</option>
-              {% endfor %}
+            <label class="form-label">Property</label>
+            <select name="property" id="addProperty" class="form-select" required onchange="updateRooms('addProperty','addRoom')">
+              <option value="">— Select property —</option>
+              <option value="Casetta">Casetta</option>
+              <option value="Folegandros">Folegandros</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Room</label>
+            <select name="room" id="addRoom" class="form-select" required>
+              <option value="">— Select property first —</option>
             </select>
           </div>
 
           <div class="row g-2 mb-3">
             <div class="col-7">
               <label class="form-label">Arrival</label>
-              <input type="date" name="arrival" class="form-control" required onchange="calcDeparture()">
+              <input type="date" name="arrival" id="addArrival" class="form-control" required onchange="calcDep()">
             </div>
             <div class="col-5">
               <label class="form-label">Nights</label>
-              <input type="number" name="num_nights" id="numNights" class="form-control" value="7" min="1" required onchange="calcDeparture()">
+              <input type="number" name="num_nights" id="addNights" class="form-control" value="7" min="1" required onchange="calcDep()">
             </div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label text-muted">Departure (calculated)</label>
-            <input type="text" id="departureDisplay" class="form-control-plaintext fw-bold ps-0" readonly value="—">
+            <label class="form-label" style="color:#aaa">Departure (calculated)</label>
+            <input type="text" id="addDepDisplay" class="form-control-plaintext fw-bold ps-0" readonly value="—">
           </div>
 
           <div class="mb-3">
             <label class="form-label">Source</label>
-            <select name="source" id="sourceSelect" class="form-select" onchange="updateSourceCode()">
+            <select name="source" id="addSource" class="form-select" onchange="syncCode('addSource','addSourceCode')">
               <option value="">— Select —</option>
               {% for name, code in sources %}
               <option value="{{ name }}" data-code="{{ code }}">{{ name }}</option>
               {% endfor %}
             </select>
           </div>
-
-          <input type="hidden" name="source_code" id="sourceCode" value="">
+          <input type="hidden" name="source_code" id="addSourceCode">
 
           <div class="mb-3">
             <label class="form-label">Rate Type</label>
@@ -74,9 +87,9 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Confirmed</label>
+            <label class="form-label">Status</label>
             <select name="confirmed" class="form-select">
-              <option value="Yes">Yes — Confirmed</option>
+              <option value="Yes">Confirmed</option>
               <option value="Prov">Provisional</option>
               <option value="CXL">Cancelled</option>
             </select>
@@ -95,38 +108,46 @@
     </div>
   </div>
 
-  <!-- Bookings list -->
+  <!-- ── Bookings Table ────────────────────────────────────────── -->
   <div class="col-lg-8">
-    <div class="d-flex align-items-center gap-2 mb-3">
-      <span class="fw-bold">Year:</span>
-      {% for y in range(2023, 2028) %}
-      <a href="/bookings?year={{ y }}" class="btn btn-sm {{ 'btn-primary' if y == year_filter else 'btn-outline-primary' }}">{{ y }}</a>
-      {% endfor %}
-    </div>
-
-    <div class="card">
-      <div class="card-header">Bookings — {{ year_filter }}</div>
-      <div class="card-body p-0">
+    <div class="card mb-4">
+      <div class="card-header">Bookings — {{ year_filter }} <small class="ms-2 fw-normal opacity-75">(click a row to edit)</small></div>
+      <div class="card-body p-0" style="overflow-x:auto">
         <table class="table table-sm table-hover mb-0">
           <thead>
             <tr>
               <th>Guest</th>
-              <th>Room</th>
+              <th>Property / Room</th>
               <th>Arrival</th>
               <th>Departure</th>
-              <th>Nights</th>
-              <th>Source</th>
+              <th>Nts</th>
+              <th>Src</th>
               <th>Status</th>
-              <th class="text-end">€ Total</th>
+              <th class="text-end">€</th>
             </tr>
           </thead>
           <tbody>
             {% for b in all_bookings %}
-            <tr class="{{ 'table-success' if b.confirmed == 'Yes' else ('table-warning' if b.confirmed == 'Prov' else 'table-secondary') }}">
+            {% set prop = b.property or 'Casetta' %}
+            <tr class="booking-row {{ 'table-success' if b.confirmed == 'Yes' else ('table-warning' if b.confirmed == 'Prov' else 'table-secondary') }}"
+                style="cursor:pointer"
+                onclick="openEdit(this)"
+                data-id="{{ b.id }}"
+                data-guest="{{ b.guest_name | e }}"
+                data-property="{{ prop }}"
+                data-room="{{ b.room }}"
+                data-arrival="{{ b.arrival }}"
+                data-nights="{{ b.num_nights }}"
+                data-source="{{ b.source or '' }}"
+                data-source-code="{{ b.source_code or '' }}"
+                data-rate="{{ b.rate_type or 'RACK' }}"
+                data-cost="{{ b.total_cost }}"
+                data-confirmed="{{ b.confirmed }}"
+                data-notes="{{ (b.notes or '') | e }}">
               <td>{{ b.guest_name }}</td>
-              <td><small>{{ b.room }}</small></td>
-              <td>{{ b.arrival }}</td>
-              <td>{{ b.departure or '—' }}</td>
+              <td><small>{{ prop }} / {{ b.room }}</small></td>
+              <td><small>{% if b.arrival %}{{ b.arrival[8:10] }}-{{ b.arrival[5:7] }}-{{ b.arrival[0:4] }}{% else %}—{% endif %}</small></td>
+              <td><small>{% if b.departure %}{{ b.departure[8:10] }}-{{ b.departure[5:7] }}-{{ b.departure[0:4] }}{% else %}—{% endif %}</small></td>
               <td>{{ b.num_nights }}</td>
               <td><small>{{ b.source_code or b.source or '—' }}</small></td>
               <td>
@@ -143,27 +164,269 @@
         </table>
       </div>
     </div>
-  </div>
 
+    <!-- ── Rates Section ─────────────────────────────────────── -->
+    <div>
+      <button class="btn btn-sm btn-outline-primary mb-3" type="button"
+              data-bs-toggle="collapse" data-bs-target="#ratesPanel"
+              aria-expanded="{{ 'true' if tab == 'rates' else 'false' }}">
+        <i class="bi bi-tags me-1"></i> Rate Periods
+      </button>
+
+      <div class="collapse {% if tab == 'rates' %}show{% endif %}" id="ratesPanel">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-tags me-2"></i>Rate Periods by Source</div>
+          <div class="card-body">
+
+            <!-- Add rate form -->
+            <form method="POST" action="/bookings/rates" class="row g-2 align-items-end mb-4 pb-3 border-bottom">
+              <input type="hidden" name="action" value="add">
+              <div class="col-md-2">
+                <label class="form-label">Property</label>
+                <select name="property" class="form-select form-select-sm" required>
+                  <option value="Casetta">Casetta</option>
+                  <option value="Folegandros">Folegandros</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Source</label>
+                <select name="source" class="form-select form-select-sm">
+                  <option value="">All sources</option>
+                  {% for name, code in sources %}
+                  <option value="{{ name }}">{{ code }} — {{ name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Room</label>
+                <select name="room" class="form-select form-select-sm">
+                  <option value="">All rooms</option>
+                  {% for r in casetta_rooms %}
+                  <option value="{{ r }}">{{ r }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Date From</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Date To</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-md-1">
+                <label class="form-label">€/Night</label>
+                <input type="number" name="rate_per_night" class="form-control form-control-sm" step="0.01" min="0" required>
+              </div>
+              <div class="col-md-12 col-lg-auto">
+                <button type="submit" class="btn btn-primary btn-sm">Add Rate</button>
+              </div>
+            </form>
+
+            <!-- Rates table -->
+            <table class="table table-sm table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Property</th>
+                  <th>Source</th>
+                  <th>Room</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th class="text-end">€/Night</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in booking_rates %}
+                <tr>
+                  <td>{{ r.property }}</td>
+                  <td><small>{{ r.source or 'All' }}</small></td>
+                  <td><small>{{ r.room or 'All rooms' }}</small></td>
+                  <td><small>{% if r.date_from %}{{ r.date_from[8:10] }}-{{ r.date_from[5:7] }}-{{ r.date_from[0:4] }}{% endif %}</small></td>
+                  <td><small>{% if r.date_to %}{{ r.date_to[8:10] }}-{{ r.date_to[5:7] }}-{{ r.date_to[0:4] }}{% endif %}</small></td>
+                  <td class="text-end fw-bold">€{{ "%.2f"|format(r.rate_per_night) }}</td>
+                  <td>
+                    <form method="POST" action="/bookings/rates" class="d-inline">
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="rate_id" value="{{ r.id }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger py-0"
+                              onclick="return confirm('Delete this rate period?')">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-3">No rate periods defined yet</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- ── Edit Booking Modal ──────────────────────────────────────────── -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--casetta-brown);color:var(--casetta-cream)">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Booking</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editForm">
+        <div class="modal-body">
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="form-label">Guest Name</label>
+              <input type="text" name="guest_name" id="e_guest" class="form-control" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Property</label>
+              <select name="property" id="e_property" class="form-select" required onchange="updateRooms('e_property','e_room')">
+                <option value="Casetta">Casetta</option>
+                <option value="Folegandros">Folegandros</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Room</label>
+              <select name="room" id="e_room" class="form-select" required></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select name="confirmed" id="e_confirmed" class="form-select">
+                <option value="Yes">Confirmed</option>
+                <option value="Prov">Provisional</option>
+                <option value="CXL">Cancelled</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Arrival</label>
+              <input type="date" name="arrival" id="e_arrival" class="form-control" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Nights</label>
+              <input type="number" name="num_nights" id="e_nights" class="form-control" min="1" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Source</label>
+              <select name="source" id="e_source" class="form-select" onchange="syncCode('e_source','e_source_code')">
+                <option value="">— Select —</option>
+                {% for name, code in sources %}
+                <option value="{{ name }}" data-code="{{ code }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+              <input type="hidden" name="source_code" id="e_source_code">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Rate Type</label>
+              <select name="rate_type" id="e_rate" class="form-select">
+                <option value="RACK">RACK Rate</option>
+                <option value="TTT">TTT Rate</option>
+                <option value="CUSTOM">Custom / Negotiated</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Total (€)</label>
+              <div class="input-group">
+                <span class="input-group-text">€</span>
+                <input type="number" name="total_cost" id="e_cost" class="form-control" step="0.01">
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" id="e_notes" class="form-control" rows="2"></textarea>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Update Booking</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-function calcDeparture() {
-  const arrival = document.querySelector('[name="arrival"]').value;
-  const nights = parseInt(document.getElementById("numNights").value) || 0;
-  if (arrival && nights) {
-    const d = new Date(arrival);
-    d.setDate(d.getDate() + nights);
-    document.getElementById("departureDisplay").value = d.toLocaleDateString("en-GB", {day:"2-digit",month:"short",year:"numeric"});
+const CASETTA_ROOMS = ["Whole House", "Cantina", "Lavanda", "Menta", "Prezzemolo", "Salvia"];
+
+function updateRooms(propId, roomId) {
+  const prop = document.getElementById(propId).value;
+  const roomSel = document.getElementById(roomId);
+  roomSel.innerHTML = "";
+  if (prop === "Folegandros") {
+    roomSel.innerHTML = '<option value="Whole House">Whole House</option>';
+    roomSel.disabled = true;
+  } else if (prop === "Casetta") {
+    roomSel.disabled = false;
+    CASETTA_ROOMS.forEach(r => {
+      const o = document.createElement("option");
+      o.value = r; o.textContent = r;
+      roomSel.appendChild(o);
+    });
+  } else {
+    roomSel.innerHTML = '<option value="">— Select property first —</option>';
+    roomSel.disabled = false;
   }
 }
 
-function updateSourceCode() {
-  const sel = document.getElementById("sourceSelect");
+function syncCode(selId, codeId) {
+  const sel = document.getElementById(selId);
   const opt = sel.options[sel.selectedIndex];
-  document.getElementById("sourceCode").value = opt ? (opt.dataset.code || "") : "";
+  document.getElementById(codeId).value = opt ? (opt.dataset.code || "") : "";
+}
+
+function calcDep() {
+  const arrival = document.getElementById("addArrival").value;
+  const nights = parseInt(document.getElementById("addNights").value) || 0;
+  if (arrival && nights) {
+    const d = new Date(arrival);
+    d.setDate(d.getDate() + nights);
+    document.getElementById("addDepDisplay").value =
+      d.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric"});
+  }
+}
+
+function openEdit(row) {
+  const d = row.dataset;
+
+  // Set form POST target
+  document.getElementById("editForm").action = "/bookings/edit/" + d.id;
+
+  // Basic fields
+  document.getElementById("e_guest").value   = d.guest;
+  document.getElementById("e_arrival").value = d.arrival;
+  document.getElementById("e_nights").value  = d.nights;
+  document.getElementById("e_cost").value    = d.cost;
+  document.getElementById("e_notes").value   = d.notes;
+
+  // Property → populate rooms → set room
+  const propSel = document.getElementById("e_property");
+  propSel.value = d.property || "Casetta";
+  updateRooms("e_property", "e_room");
+  document.getElementById("e_room").value = d.room;
+
+  // Source
+  document.getElementById("e_source").value       = d.source || "";
+  document.getElementById("e_source_code").value  = d.sourceCode || "";
+
+  // Rate type & status
+  document.getElementById("e_rate").value      = d.rate || "RACK";
+  document.getElementById("e_confirmed").value = d.confirmed;
+
+  new bootstrap.Modal(document.getElementById("editModal")).show();
 }
 </script>
 {% endblock %}
