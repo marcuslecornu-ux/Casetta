@@ -538,6 +538,19 @@ def edit_expense(uid):
     return redirect(url_for("expenses", tab="expenses", year=dt.year))
 
 
+@app.route("/expenses/delete/<uid>", methods=["POST"])
+@login_required
+def delete_expense(uid):
+    conn = get_db()
+    row = conn.execute("SELECT year FROM expenses WHERE uid=?", (uid,)).fetchone()
+    year = row["year"] if row else date.today().year
+    conn.execute("DELETE FROM expenses WHERE uid=?", (uid,))
+    conn.commit()
+    conn.close()
+    flash("Expense deleted.", "success")
+    return redirect(url_for("expenses", tab="expenses", year=year))
+
+
 @app.route("/api/expense_suppliers/<path:category>")
 @login_required
 def api_expense_suppliers(category):
