@@ -600,26 +600,89 @@ def manager():
         WHEN 'APR' THEN 4 WHEN 'MAY' THEN 5 WHEN 'JUN' THEN 6
         WHEN 'JUL' THEN 7 WHEN 'AUG' THEN 8 WHEN 'SEP' THEN 9
         WHEN 'OCT' THEN 10 WHEN 'NOV' THEN 11 WHEN 'DEC' THEN 12 ELSE 0 END"""
+
+    # Year / month filters
+    filter_year  = request.args.get("filter_year",  "all")
+    filter_month = request.args.get("filter_month", "all")
+
+    where  = ["status='Forecast'",
+              f"(year < ? OR (year = ? AND ({_month_num}) < ?))"]
+    params = [today.year, today.year, today.month]
+
+    if filter_year != "all":
+        where.append("year = ?")
+        params.append(int(filter_year))
+    if filter_month != "all":
+        where.append(f"TRIM(UPPER(month)) = ?")
+        params.append(filter_month.upper())
+
     overdue = conn.execute(f"""
         SELECT *, ({_month_num}) AS month_num
         FROM expenses
+        WHERE {' AND '.join(where)}
+        ORDER BY year, ({_month_num}), category
+    """, params).fetchall()
+
+    # Available years for filter (all overdue years, unfiltered)
+    all_years = conn.execute(f"""
+        SELECT DISTINCT year FROM expenses
         WHERE status='Forecast'
           AND (year < ? OR (year = ? AND ({_month_num}) < ?))
-        ORDER BY year, ({_month_num}), category
+        ORDER BY year
     """, (today.year, today.year, today.month)).fetchall()
+
     total = sum(r["amount"] for r in overdue)
     suppliers = conn.execute(
         "SELECT DISTINCT name FROM expense_suppliers WHERE active=1 ORDER BY name"
     ).fetchall()
     conn.close()
     from database import EXPENSE_CATEGORIES
+    _months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     return render_template("manager.html",
         overdue=overdue,
         total=total,
         today=today.isoformat(),
         categories=EXPENSE_CATEGORIES,
         suppliers=[r["name"] for r in suppliers],
+        all_years=[r["year"] for r in all_years],
+        filter_year=filter_year,
+        filter_month=filter_month,
+        month_names=_months,
     )
+
+
+@app.route("/manager/mark-all-paid", methods=["POST"])
+@login_required
+def manager_mark_all_paid():
+    today = date.today()
+    conn  = get_db()
+    _month_num = """CASE TRIM(UPPER(month))
+        WHEN 'JAN' THEN 1 WHEN 'FEB' THEN 2 WHEN 'MAR' THEN 3
+        WHEN 'APR' THEN 4 WHEN 'MAY' THEN 5 WHEN 'JUN' THEN 6
+        WHEN 'JUL' THEN 7 WHEN 'AUG' THEN 8 WHEN 'SEP' THEN 9
+        WHEN 'OCT' THEN 10 WHEN 'NOV' THEN 11 WHEN 'DEC' THEN 12 ELSE 0 END"""
+    filter_year  = request.form.get("filter_year",  "all")
+    filter_month = request.form.get("filter_month", "all")
+    where  = ["status='Forecast'",
+              f"(year < ? OR (year = ? AND ({_month_num}) < ?))"]
+    params = [today.year, today.year, today.month]
+    if filter_year != "all":
+        where.append("year = ?")
+        params.append(int(filter_year))
+    if filter_month != "all":
+        where.append(f"TRIM(UPPER(month)) = ?")
+        params.append(filter_month.upper())
+    result = conn.execute(
+        f"UPDATE expenses SET status='Paid' WHERE {' AND '.join(where)}", params)
+    count = result.rowcount
+    log_action(conn, "UPDATE", "expense", None,
+               f"Manager: bulk marked {count} forecast expense(s) as Paid"
+               + (f" — year {filter_year}" if filter_year != "all" else "")
+               + (f" {filter_month}" if filter_month != "all" else ""))
+    conn.commit()
+    conn.close()
+    flash(f"{count} expense(s) marked as Paid.", "success")
+    return redirect(url_for("manager", filter_year=filter_year, filter_month=filter_month))
 
 
 @app.route("/manager/mark-paid/<uid>", methods=["POST"])

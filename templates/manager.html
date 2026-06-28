@@ -5,11 +5,53 @@
   #mgr-tbody tr:hover .row-edit-hint { opacity: 1 !important; }
 </style>
 
-<div class="d-flex align-items-center mb-3 gap-3">
+<div class="d-flex align-items-center mb-3 gap-3 flex-wrap">
   <h2 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Manager Actions</h2>
   {% if overdue %}
   <span class="badge bg-danger fs-6">{{ overdue|length }} outstanding</span>
+  {% endif %}
   <span class="ms-auto fw-bold text-danger">Total: €{{ "%.2f"|format(total) }}</span>
+</div>
+
+<!-- Filters -->
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+  <span class="text-muted small">Filter:</span>
+
+  <!-- Year -->
+  <div class="btn-group btn-group-sm">
+    <a href="{{ url_for('manager', filter_year='all', filter_month=filter_month) }}"
+       class="btn {{ 'btn-secondary' if filter_year == 'all' else 'btn-outline-secondary' }}">All years</a>
+    {% for y in all_years %}
+    <a href="{{ url_for('manager', filter_year=y, filter_month=filter_month) }}"
+       class="btn {{ 'btn-secondary' if filter_year|string == y|string else 'btn-outline-secondary' }}">{{ y }}</a>
+    {% endfor %}
+  </div>
+
+  <!-- Month -->
+  <div class="btn-group btn-group-sm">
+    <a href="{{ url_for('manager', filter_year=filter_year, filter_month='all') }}"
+       class="btn {{ 'btn-secondary' if filter_month == 'all' else 'btn-outline-secondary' }}">All months</a>
+    {% for m in month_names %}
+    <a href="{{ url_for('manager', filter_year=filter_year, filter_month=m) }}"
+       class="btn {{ 'btn-secondary' if filter_month|upper == m|upper else 'btn-outline-secondary' }}">{{ m }}</a>
+    {% endfor %}
+  </div>
+
+  {% if filter_year != 'all' or filter_month != 'all' %}
+  <a href="{{ url_for('manager') }}" class="btn btn-sm btn-outline-danger">
+    <i class="bi bi-x-circle me-1"></i>Reset
+  </a>
+  {% endif %}
+
+  {% if overdue %}
+  <form method="POST" action="{{ url_for('manager_mark_all_paid') }}" class="ms-auto"
+        onsubmit="return confirm('Mark all {{ overdue|length }} shown expense(s) as Paid?')">
+    <input type="hidden" name="filter_year"  value="{{ filter_year }}">
+    <input type="hidden" name="filter_month" value="{{ filter_month }}">
+    <button class="btn btn-sm btn-success">
+      <i class="bi bi-check-all me-1"></i>Mark All as Paid ({{ overdue|length }})
+    </button>
+  </form>
   {% endif %}
 </div>
 
