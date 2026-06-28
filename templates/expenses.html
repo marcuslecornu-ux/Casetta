@@ -329,7 +329,7 @@
         <table class="table table-sm table-hover mb-0" id="monthModalTable" style="display:none">
           <thead class="table-dark">
             <tr>
-              <th>Date</th><th>Category</th><th>Sub-Category</th><th>Description</th><th>Supplier</th><th class="text-end">Amount €</th>
+              <th>Date</th><th>Category</th><th>Sub-Category</th><th>Comments</th><th>Status</th><th class="text-end">Amount €</th>
             </tr>
           </thead>
           <tbody id="monthModalBody"></tbody>
@@ -372,8 +372,8 @@ document.querySelectorAll('.month-drill-row').forEach(function(row) {
               '<td>' + (e.date || '') + '</td>' +
               '<td>' + (e.category || '') + '</td>' +
               '<td>' + (e.sub_category || '') + '</td>' +
-              '<td>' + (e.description || '') + '</td>' +
-              '<td>' + (e.supplier || '') + '</td>' +
+              '<td>' + (e.comments || '') + '</td>' +
+              '<td>' + (e.status || '') + '</td>' +
               '<td class="text-end">€' + (e.amount || 0).toFixed(2) + '</td>';
             tbody.appendChild(tr);
           });

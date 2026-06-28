@@ -815,7 +815,7 @@ def expenses_month_detail():
         return jsonify([])
     conn = get_db()
     rows = conn.execute("""
-        SELECT date, category, sub_category, description, supplier, amount, reference
+        SELECT date, category, sub_category, comments, amount, status
         FROM expenses
         WHERE year=? AND TRIM(month)=?
         ORDER BY date, category
