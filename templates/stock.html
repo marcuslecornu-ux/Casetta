@@ -292,8 +292,37 @@
 
   <!-- ── MOVEMENT HISTORY ──────────────────────────────────────── -->
   <div class="tab-pane fade" id="tabHistory">
+    <form method="GET" action="/stock" class="card mb-3">
+      <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-4">
+            <label class="form-label form-label-sm mb-1">Item search</label>
+            <input type="text" name="mvt_search" class="form-control form-control-sm"
+                   placeholder="Wine name…" value="{{ mvt_search }}">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label form-label-sm mb-1">Movement type</label>
+            <select name="mvt_type" class="form-select form-select-sm">
+              <option value="">All types</option>
+              <option value="Purchase"    {% if mvt_type == 'Purchase'     %}selected{% endif %}>Purchase</option>
+              <option value="Adjustment +" {% if mvt_type == 'Adjustment +' %}selected{% endif %}>Adjustment +</option>
+              <option value="Adjustment -" {% if mvt_type == 'Adjustment -' %}selected{% endif %}>Adjustment -</option>
+              <option value="Wastage"     {% if mvt_type == 'Wastage'      %}selected{% endif %}>Wastage</option>
+              <option value="New Item"    {% if mvt_type == 'New Item'     %}selected{% endif %}>New Item</option>
+            </select>
+          </div>
+          <div class="col-auto d-flex gap-1">
+            <button type="submit" class="btn btn-primary btn-sm" onclick="this.closest('form').action='/stock#tabHistory'">Filter</button>
+            <a href="/stock#tabHistory" class="btn btn-outline-secondary btn-sm">✕</a>
+          </div>
+        </div>
+      </div>
+    </form>
     <div class="card">
-      <div class="card-header">Recent Stock Movements</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Stock Movements</span>
+        <small class="text-muted">{{ movements|length }} entries (max 200)</small>
+      </div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
           <thead>
@@ -322,6 +351,7 @@
       </div>
     </div>
   </div>
+</div>
 
 </div>
 {% endblock %}

@@ -120,16 +120,22 @@
                         title="View details">
                   <i class="bi bi-eye"></i>
                 </button>
-                {% set entity_urls = {
-                    'booking': '/bookings',
-                    'drink_sale': '/sales',
-                    'stock_movement': '/stock#tabHistory',
-                    'stock_item': '/stock#tabInventory',
-                    'expense': '/expenses'
-                } %}
-                <a class="btn btn-outline-primary btn-sm"
-                   href="{{ entity_urls.get(log.entity_type, '/admin') }}"
-                   title="Go to record">
+                {% if log.entity_type == 'booking' and log.entity_id and log.action_type != 'DELETE' %}
+                  {% set go_url = '/bookings?open=' ~ log.entity_id %}
+                {% elif log.entity_type == 'drink_sale' %}
+                  {% set go_url = '/sales' %}
+                {% elif log.entity_type == 'stock_movement' %}
+                  {% set go_url = '/stock#tabHistory' %}
+                {% elif log.entity_type == 'stock_item' %}
+                  {% set go_url = '/stock#tabInventory' %}
+                {% elif log.entity_type == 'expense' %}
+                  {% set go_url = '/expenses' %}
+                {% else %}
+                  {% set go_url = '/admin' %}
+                {% endif %}
+                <a class="btn btn-outline-primary btn-sm {% if log.action_type == 'DELETE' %}disabled{% endif %}"
+                   href="{{ go_url }}"
+                   title="{% if log.action_type == 'DELETE' %}Record deleted{% else %}Go to record{% endif %}">
                   <i class="bi bi-arrow-up-right-square"></i>
                 </a>
                 <button class="btn btn-outline-danger btn-sm"

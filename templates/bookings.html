@@ -448,5 +448,22 @@ function deleteBooking() {
   bootstrap.Modal.getInstance(document.getElementById("editModal")).hide();
   document.getElementById("deleteBookingForm").submit();
 }
+
+// Auto-open edit modal if ?open=<id> is in the URL (e.g. from Audit Log)
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const openId = params.get("open");
+  if (!openId) return;
+  const row = document.querySelector(`tr[data-id="${openId}"]`);
+  if (row) {
+    openEdit(row);
+  } else {
+    // Booking may be on a different year filter — flash a message
+    const banner = document.createElement("div");
+    banner.className = "alert alert-warning alert-dismissible fade show";
+    banner.innerHTML = `Booking #${openId} not visible in current year filter. <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.querySelector(".section-title")?.after(banner);
+  }
+})();
 </script>
 {% endblock %}

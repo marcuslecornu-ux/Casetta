@@ -246,9 +246,15 @@ def sales():
 @login_required
 def edit_sale(uid):
     conn = get_db()
+    # Get original sale to calculate stock diff
+    original = conn.execute("SELECT item_id, quantity FROM drink_sales WHERE uid=?", (uid,)).fetchone()
+    old_item_id  = original["item_id"]  if original else None
+    old_quantity = original["quantity"] if original else 0
+
     unit_type  = request.form.get("unit_type", "Bottle")
     is_hosted  = 1 if request.form.get("is_hosted") else 0
     quantity   = int(request.form.get("quantity", 1))
+    new_item_id = request.form.get("item_id", "")
     unit_price = float(request.form.get("unit_price", 0))
     discount_pct = float(request.form.get("discount_pct", 0))
 
@@ -267,7 +273,7 @@ def edit_sale(uid):
     """, (
         request.form.get("date"),
         request.form.get("room"),
-        request.form.get("item_id", ""),
+        new_item_id,
         request.form.get("item_name"),
         request.form.get("category"),
         quantity, unit_type, unit_price, discount_pct,
@@ -275,9 +281,25 @@ def edit_sale(uid):
         request.form.get("notes", ""),
         uid
     ))
+
+    # Adjust stock: restore old, deduct new
+    if old_item_id:
+        if old_item_id == new_item_id:
+            # Same item — just apply the difference
+            diff = quantity - old_quantity
+            if diff > 0:
+                conn.execute("UPDATE stock_items SET current_stock = MAX(0, current_stock - ?) WHERE id=?", (diff, new_item_id))
+            elif diff < 0:
+                conn.execute("UPDATE stock_items SET current_stock = current_stock + ? WHERE id=?", (-diff, new_item_id))
+        else:
+            # Item changed — restore old item stock, deduct new item stock
+            conn.execute("UPDATE stock_items SET current_stock = current_stock + ? WHERE id=?", (old_quantity, old_item_id))
+            conn.execute("UPDATE stock_items SET current_stock = MAX(0, current_stock - ?) WHERE id=?", (quantity, new_item_id))
+
     log_action(conn, "UPDATE", "drink_sale", uid,
                f"Edited sale: {quantity}x {request.form.get('item_name')} — €{total_sale:.2f}",
-               {"room": request.form.get("room"), "quantity": quantity, "total": total_sale})
+               {"room": request.form.get("room"), "quantity": quantity, "total": total_sale,
+                "stock_adjusted": f"{old_item_id} qty {old_quantity} → {new_item_id} qty {quantity}"})
     conn.commit()
     conn.close()
     flash("Sale updated.", "success")
@@ -288,13 +310,20 @@ def edit_sale(uid):
 @login_required
 def delete_sale(uid):
     conn = get_db()
-    row = conn.execute("SELECT item_name, quantity, room FROM drink_sales WHERE uid=?", (uid,)).fetchone()
-    log_action(conn, "DELETE", "drink_sale", uid,
-               f"Deleted sale: {row['item_name']} x{row['quantity']} ({row['room']})" if row else f"Deleted sale {uid}")
+    row = conn.execute("SELECT item_id, item_name, quantity, room FROM drink_sales WHERE uid=?", (uid,)).fetchone()
+    if row:
+        # Restore stock
+        conn.execute("UPDATE stock_items SET current_stock = current_stock + ? WHERE id=?",
+                     (row["quantity"], row["item_id"]))
+        log_action(conn, "DELETE", "drink_sale", uid,
+                   f"Deleted sale: {row['item_name']} x{row['quantity']} ({row['room']})",
+                   {"item_id": row["item_id"], "quantity": row["quantity"], "stock_restored": True})
+    else:
+        log_action(conn, "DELETE", "drink_sale", uid, f"Deleted sale {uid}")
     conn.execute("DELETE FROM drink_sales WHERE uid=?", (uid,))
     conn.commit()
     conn.close()
-    flash("Sale deleted.", "success")
+    flash("Sale deleted. Stock restored.", "success")
     return redirect(url_for("sales"))
 
 
@@ -339,17 +368,18 @@ def items_by_category(category):
 def update_prices():
     conn = get_db()
     item_id = request.form.get("item_id")
+    item = conn.execute("SELECT name FROM stock_items WHERE id=?", (item_id,)).fetchone()
+    new_buy  = float(request.form.get("purchase_price", 0))
+    new_sell = float(request.form.get("selling_price_bottle", 0))
+    new_gls  = float(request.form.get("selling_price_glass", 0))
     conn.execute("""
         UPDATE stock_items
         SET purchase_price=?, selling_price_bottle=?, selling_price_glass=?, location=?
         WHERE id=?
-    """, (
-        float(request.form.get("purchase_price", 0)),
-        float(request.form.get("selling_price_bottle", 0)),
-        float(request.form.get("selling_price_glass", 0)),
-        request.form.get("location", ""),
-        item_id
-    ))
+    """, (new_buy, new_sell, new_gls, request.form.get("location", ""), item_id))
+    log_action(conn, "UPDATE", "stock_item", item_id,
+               f"Prices updated: {item['name'] if item else item_id} — buy €{new_buy:.2f} / sell €{new_sell:.2f}",
+               {"purchase_price": new_buy, "selling_price_bottle": new_sell, "selling_price_glass": new_gls})
     conn.commit()
     conn.close()
     flash(f"Prices updated for {item_id}.", "success")
@@ -461,9 +491,16 @@ def stock():
     items = conn.execute(
         "SELECT * FROM stock_items WHERE active=1 ORDER BY category, name"
     ).fetchall()
-    movements = conn.execute(
-        "SELECT * FROM stock_movements ORDER BY created_at DESC LIMIT 30"
-    ).fetchall()
+    mvt_type   = request.args.get("mvt_type", "")
+    mvt_search = request.args.get("mvt_search", "")
+    mvt_query  = "SELECT * FROM stock_movements WHERE 1=1"
+    mvt_params = []
+    if mvt_type:
+        mvt_query += " AND movement_type=?"; mvt_params.append(mvt_type)
+    if mvt_search:
+        mvt_query += " AND item_name LIKE ?"; mvt_params.append(f"%{mvt_search}%")
+    mvt_query += " ORDER BY created_at DESC LIMIT 200"
+    movements = conn.execute(mvt_query, mvt_params).fetchall()
     conn.close()
 
     return render_template("stock.html",
@@ -471,7 +508,9 @@ def stock():
         movements=movements,
         categories=DRINK_CATEGORIES,
         locations=LOCATIONS,
-        today=date.today().isoformat()
+        today=date.today().isoformat(),
+        mvt_type=mvt_type,
+        mvt_search=mvt_search,
     )
 
 
@@ -525,6 +564,10 @@ def expenses():
                         VALUES (?,?,?,?,?,?,?,?,?,?)
                     """, (uid, exp_date, entry_date, category, sub_cat, comments, amount,
                           status, dt.strftime("%b"), dt.year))
+                    log_action(conn, "CREATE", "expense", uid,
+                               f"Recurring expense: {category} — €{amount:.2f} ({dt.strftime('%b %Y')})",
+                               {"category": category, "sub_category": sub_cat,
+                                "amount": amount, "month": dt.strftime("%b %Y"), "recurring": True})
                     created += 1
                 conn.commit()
                 flash(f"{created} expense records created.", "success")
@@ -850,22 +893,26 @@ def manage_rates():
     conn = get_db()
     action = request.form.get("action")
     if action == "add":
+        rate   = float(request.form.get("rate_per_night", 0))
+        prop   = request.form.get("property")
+        d_from = request.form.get("date_from")
+        d_to   = request.form.get("date_to")
         conn.execute("""
             INSERT INTO booking_rates (property, room, source, date_from, date_to, rate_per_night, notes)
             VALUES (?,?,?,?,?,?,?)
-        """, (
-            request.form.get("property"),
-            request.form.get("room", ""),
-            request.form.get("source", ""),
-            request.form.get("date_from"),
-            request.form.get("date_to"),
-            float(request.form.get("rate_per_night", 0)),
-            request.form.get("notes", "")
-        ))
+        """, (prop, request.form.get("room", ""), request.form.get("source", ""),
+              d_from, d_to, rate, request.form.get("notes", "")))
+        log_action(conn, "CREATE", "booking_rate", None,
+                   f"Rate added: {prop} €{rate:.0f}/night ({d_from} → {d_to})",
+                   {"property": prop, "rate": rate, "from": d_from, "to": d_to})
         conn.commit()
         flash("Rate period added.", "success")
     elif action == "delete":
-        conn.execute("DELETE FROM booking_rates WHERE id=?", (request.form.get("rate_id"),))
+        rate_id = request.form.get("rate_id")
+        row = conn.execute("SELECT property, rate_per_night, date_from FROM booking_rates WHERE id=?", (rate_id,)).fetchone()
+        log_action(conn, "DELETE", "booking_rate", rate_id,
+                   f"Rate deleted: {row['property']} €{row['rate_per_night']:.0f}/night from {row['date_from']}" if row else f"Rate {rate_id} deleted")
+        conn.execute("DELETE FROM booking_rates WHERE id=?", (rate_id,))
         conn.commit()
         flash("Rate deleted.", "success")
     conn.close()
