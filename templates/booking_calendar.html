@@ -397,13 +397,31 @@ function renderCalendar() {
 
   const rooms = curProp === 'Casetta' ? CASETTA_ROOMS : FOL_ROOMS;
 
+  // Normalise room name: strip property prefix e.g. "Casetta Whole House" → "Whole House"
+  function normRoom(r) {
+    return (r || 'Whole House')
+      .replace(/^Casetta\s+/i, '')
+      .replace(/^Folegandros\s+/i, '')
+      .trim();
+  }
+
+  // Resolve departure: use stored value or calculate from num_nights
+  function resolveDep(b) {
+    if (b.departure) return b.departure;
+    if (b.arrival && b.num_nights) return addDays(b.arrival, parseInt(b.num_nights));
+    return null;
+  }
+
   // Filter bookings overlapping this month
   const mStart = new Date(y, m-1, 1);
   const mEnd   = new Date(y, m-1, dim, 23, 59);
   const mBks = allBookings.filter(b => {
-    if ((b.property || 'Casetta') !== curProp) return false;
-    if (!b.arrival || !b.departure) return false;
-    return new Date(b.arrival) <= mEnd && new Date(b.departure) > mStart;
+    const bProp = (b.property || 'Casetta').trim();
+    if (bProp !== curProp) return false;
+    if (!b.arrival) return false;
+    const dep = resolveDep(b);
+    if (!dep) return false;
+    return new Date(b.arrival) <= mEnd && new Date(dep) > mStart;
   });
 
   // Legend
@@ -445,14 +463,14 @@ function renderCalendar() {
     html += `<td class="cal-room-cell" style="background:var(--casetta-light);">${icon}${room}</td>`;
 
     // Bookings for this room in this month
-    const rBks = mBks.filter(b => (b.room || 'Whole House') === room);
+    const rBks = mBks.filter(b => normRoom(b.room) === room);
 
     let d = 1;
     while (d <= dim) {
       // Find booking covering day d
       const bk = rBks.find(b => {
         const arr  = new Date(b.arrival);
-        const dep  = new Date(b.departure);
+        const dep  = new Date(resolveDep(b));
         const aDay = (arr.getFullYear()===y && arr.getMonth()===m-1) ? arr.getDate() : 1;
         const dDay = (dep.getFullYear()===y && dep.getMonth()===m-1) ? dep.getDate() : dim+1;
         return aDay <= d && dDay > d;
@@ -460,7 +478,7 @@ function renderCalendar() {
 
       if (bk) {
         const arr  = new Date(bk.arrival);
-        const dep  = new Date(bk.departure);
+        const dep  = new Date(resolveDep(bk));
         const aDay = (arr.getFullYear()===y && arr.getMonth()===m-1) ? arr.getDate() : 1;
         const dDay = (dep.getFullYear()===y && dep.getMonth()===m-1) ? dep.getDate() : dim+1;
 
@@ -493,7 +511,7 @@ function renderCalendar() {
         else if (span >= 2) name = ((bk.guest_name||'').charAt(0)||'') + '.';
 
         const nights = bk.num_nights;
-        const tip = `${bk.guest_name} · ${fmtDate(bk.arrival)}–${fmtDate(bk.departure)} (${nights}n) · ${bk.source||''}`
+        const tip = `${bk.guest_name} · ${fmtDate(bk.arrival)}–${fmtDate(resolveDep(bk))} (${nights}n) · ${bk.source||''}`
           .replace(/"/g,'&quot;');
 
         html += `<td colspan="${span}"
@@ -547,7 +565,7 @@ function showDetail(id) {
   document.getElementById('dm-room').textContent     = `${b.property||'Casetta'} — ${b.room||''}`;
   document.getElementById('dm-arrival').textContent  = fmtDate(b.arrival);
   document.getElementById('dm-nights').textContent   = b.num_nights + 'n';
-  document.getElementById('dm-departure').textContent = fmtDate(b.departure);
+  document.getElementById('dm-departure').textContent = fmtDate(b.departure || addDays(b.arrival, parseInt(b.num_nights)||0));
   document.getElementById('dm-source').textContent   = b.source || '—';
   document.getElementById('dm-rate').textContent     = b.rate_type || '—';
   document.getElementById('dm-total').textContent    = b.total_cost ? `€${Number(b.total_cost).toLocaleString()}` : '—';
