@@ -9,7 +9,7 @@
 {% macro pct(v) %}{% if v %}{{ v }}%{% else %}—{% endif %}{% endmacro %}
 
 {# ── Header ──────────────────────────────────────────────────────────────────── #}
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+<div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
   <div class="section-title mb-0"><i class="bi bi-bar-chart-line me-2"></i>Accounting</div>
   <div class="d-flex gap-2 align-items-center flex-wrap">
     {% for y in available_years %}
@@ -19,6 +19,28 @@
     </a>
     {% endfor %}
   </div>
+</div>
+
+{# ── Business Stream selector ─────────────────────────────────────────────────── #}
+<div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+  <span class="text-muted small fw-semibold me-1">Business stream:</span>
+  <button class="btn btn-sm stream-btn active" data-stream="total"
+          style="background:#3c2415;color:#fff;border:none">
+    <i class="bi bi-layers me-1"></i>All
+  </button>
+  <button class="btn btn-sm btn-outline-secondary stream-btn" data-stream="casetta"
+          style="border-color:#4a90d9;color:#4a90d9">
+    <i class="bi bi-house me-1"></i>Casetta
+  </button>
+  <button class="btn btn-sm btn-outline-secondary stream-btn" data-stream="farm"
+          style="border-color:#5cb85c;color:#5cb85c">
+    <i class="bi bi-tree me-1"></i>Farm
+  </button>
+  <button class="btn btn-sm btn-outline-secondary stream-btn" data-stream="personal"
+          style="border-color:#f0ad4e;color:#f0ad4e">
+    <i class="bi bi-person me-1"></i>Personal
+  </button>
+  <small class="text-muted ms-2" id="streamLabel">Showing all costs combined</small>
 </div>
 
 {# ── Tabs ─────────────────────────────────────────────────────────────────────── #}
@@ -45,7 +67,7 @@
   {% set ytd_drinks  = row_total(inc_drinks) %}
   {% set ytd_other   = inc_other.values()|map('sum')|sum %}
 
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
       <div class="card p-3 text-center h-100" style="border-left:4px solid var(--casetta-gold)">
         <div class="text-muted small mb-1">YTD Revenue</div>
@@ -54,22 +76,45 @@
     </div>
     <div class="col-6 col-md-3">
       <div class="card p-3 text-center h-100" style="border-left:4px solid #dc3545">
-        <div class="text-muted small mb-1">YTD Costs</div>
-        <div class="fw-bold fs-4 text-danger">€{{ "{:,.0f}".format(ytd_costs) }}</div>
+        <div class="text-muted small mb-1">YTD Costs <small id="kpiStreamLabel" class="text-muted">(All)</small></div>
+        <div class="fw-bold fs-4 text-danger" id="kpiCosts">€{{ "{:,.0f}".format(ytd_costs) }}</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="card p-3 text-center h-100" style="border-left:4px solid {% if ytd_profit >= 0 %}#198754{% else %}#dc3545{% endif %}">
-        <div class="text-muted small mb-1">YTD Profit</div>
-        <div class="fw-bold fs-4 {% if ytd_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-          €{{ "{:,.0f}".format(ytd_profit) }}
-        </div>
+      <div class="card p-3 text-center h-100" style="border-left:4px solid #198754">
+        <div class="text-muted small mb-1">YTD Profit <small class="text-muted" id="kpiProfitStream">(All)</small></div>
+        <div class="fw-bold fs-4" id="kpiProfit">€{{ "{:,.0f}".format(ytd_profit) }}</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
       <div class="card p-3 text-center h-100" style="border-left:4px solid #0d6efd">
         <div class="text-muted small mb-1">Margin</div>
-        <div class="fw-bold fs-4">{{ ytd_margin }}%</div>
+        <div class="fw-bold fs-4" id="kpiMargin">{{ ytd_margin }}%</div>
+      </div>
+    </div>
+  </div>
+
+  {# Stream cost breakdown #}
+  <div class="row g-2 mb-4">
+    <div class="col-md-4">
+      <div class="card p-2 text-center" style="border-top:3px solid #4a90d9">
+        <div class="text-muted small"><i class="bi bi-house me-1"></i>Casetta Costs</div>
+        <div class="fw-semibold" style="color:#4a90d9">€{{ "{:,.0f}".format(row_total(exp_casetta)) }}</div>
+        <div class="text-muted" style="font-size:.75rem">{{ ((row_total(exp_casetta)/ytd_costs*100)|round(0)|int if ytd_costs else 0) }}% of total costs</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-2 text-center" style="border-top:3px solid #5cb85c">
+        <div class="text-muted small"><i class="bi bi-tree me-1"></i>Farm Costs</div>
+        <div class="fw-semibold" style="color:#5cb85c">€{{ "{:,.0f}".format(row_total(exp_farm)) }}</div>
+        <div class="text-muted" style="font-size:.75rem">{{ ((row_total(exp_farm)/ytd_costs*100)|round(0)|int if ytd_costs else 0) }}% of total costs</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-2 text-center" style="border-top:3px solid #f0ad4e">
+        <div class="text-muted small"><i class="bi bi-person me-1"></i>Personal Costs</div>
+        <div class="fw-semibold" style="color:#f0ad4e">€{{ "{:,.0f}".format(row_total(exp_personal)) }}</div>
+        <div class="text-muted" style="font-size:.75rem">{{ ((row_total(exp_personal)/ytd_costs*100)|round(0)|int if ytd_costs else 0) }}% of total costs</div>
       </div>
     </div>
   </div>
@@ -178,9 +223,10 @@
             {# ── EXPENSES ── #}
             <tr style="background:var(--casetta-light)">
               <td colspan="14" class="fw-bold text-uppercase small" style="letter-spacing:.05em;color:#dc3545">
-                <i class="bi bi-graph-down-arrow me-1"></i>Expenses
+                <i class="bi bi-graph-down-arrow me-1"></i>Expenses — <span id="plStreamLabel">All</span>
               </td>
             </tr>
+            <tbody id="plExpBody">
             {% for cat in exp_cats %}
             <tr>
               <td class="ps-3 text-muted">{{ cat }}</td>
@@ -188,21 +234,22 @@
               <td class="text-end fw-bold">{{ fmt(row_total(exp_rows[cat])) }}</td>
             </tr>
             {% endfor %}
-            <tr class="table-danger fw-bold">
+            </tbody>
+            <tr class="table-danger fw-bold" id="plExpTotal">
               <td>Total Expenses</td>
               {% for v in exp_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
               <td class="text-end">{{ fmt(row_total(exp_total)) }}</td>
             </tr>
 
             {# ── PROFIT ── #}
-            <tr style="background:var(--casetta-brown);color:#fff">
+            <tr style="background:var(--casetta-brown);color:#fff" id="plProfitRow">
               <td class="fw-bold">NET PROFIT</td>
               {% for v in profit %}
               <td class="text-end fw-bold {% if v < 0 %}text-warning{% endif %}">{{ fmt(v) }}</td>
               {% endfor %}
               <td class="text-end fw-bold">{{ fmt(row_total(profit)) }}</td>
             </tr>
-            <tr class="table-secondary">
+            <tr class="table-secondary" id="plMarginRow">
               <td class="text-muted">Margin %</td>
               {% for v in margin %}<td class="text-end text-muted">{{ pct(v) }}</td>{% endfor %}
               {% set tot_margin = (row_total(profit)/row_total(inc_total)*100)|round(1) if row_total(inc_total) else 0 %}
@@ -275,27 +322,44 @@
    EXPENSE BREAKDOWN
 ════════════════════════════════════════════════════════════════════════ #}
 <div class="tab-pane fade" id="tabExpenses">
+  {# Stream summary cards #}
+  <div class="row g-3 mb-3">
+    {% for stream, label, col in [('total','All','#3c2415'),('casetta','Casetta','#4a90d9'),('farm','Farm','#5cb85c'),('personal','Personal','#f0ad4e')] %}
+    {% set vals = exp_casetta if stream == 'casetta' else (exp_farm if stream == 'farm' else (exp_personal if stream == 'personal' else exp_total)) %}
+    <div class="col-6 col-md-3">
+      <div class="card p-2 text-center stream-cost-card" data-stream="{{ stream }}" style="border-top:3px solid {{ col }};cursor:pointer"
+           onclick="setStream('{{ stream }}')">
+        <div class="small text-muted">{{ label }}</div>
+        <div class="fw-bold" style="color:{{ col }}">€{{ "{:,.0f}".format(row_total(vals)) }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
   <div class="card mb-4">
-    <div class="card-header">Expenses by Category — {{ year }}</div>
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span>Expenses by Category — <span id="expTabStreamLabel">All</span></span>
+      <small class="text-white-50">Click a stream card above to filter</small>
+    </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-sm table-bordered mb-0 small">
+        <table class="table table-sm table-bordered mb-0 small" id="expTable">
           <thead class="table-dark">
             <tr>
-              <th style="min-width:160px">Category</th>
+              <th style="min-width:190px">Category</th>
               {% for l in month_labels %}<th class="text-end" style="min-width:72px">{{ l }}</th>{% endfor %}
               <th class="text-end">TOTAL</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="expTableBody">
             {% for cat in exp_cats %}
             <tr>
               <td class="ps-2">{{ cat }}</td>
-              {% for v in exp_rows[cat] %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
-              <td class="text-end fw-bold">{{ fmt(row_total(exp_rows[cat])) }}</td>
+              {% for v in exp_rows[cat] %}<td class="text-end exp-cell">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold exp-total-cell">{{ fmt(row_total(exp_rows[cat])) }}</td>
             </tr>
             {% endfor %}
-            <tr class="table-danger fw-bold">
+            <tr class="table-danger fw-bold" id="expGrandTotal">
               <td>TOTAL EXPENSES</td>
               {% for v in exp_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
               <td class="text-end">{{ fmt(row_total(exp_total)) }}</td>
@@ -305,9 +369,21 @@
       </div>
     </div>
   </div>
-  <div class="card">
-    <div class="card-header">Expense Trend by Category</div>
-    <div class="card-body"><canvas id="expChart" height="100"></canvas></div>
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">Expense Trend by Category</div>
+        <div class="card-body"><canvas id="expChart" height="120"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">Cost Split by Stream</div>
+        <div class="card-body d-flex align-items-center justify-content-center">
+          <canvas id="streamDonut" style="max-height:240px"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -318,18 +394,32 @@
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const MONTHS   = {{ month_labels | tojson }};
+const MONTHS     = {{ month_labels | tojson }};
+const YM_LIST    = {{ months | tojson }};
 const INC_ACCOM  = {{ inc_accom | tojson }};
 const INC_DRINKS = {{ inc_drinks | tojson }};
 const INC_TOTAL  = {{ inc_total | tojson }};
-const EXP_TOTAL  = {{ exp_total | tojson }};
-const PROFIT     = {{ profit | tojson }};
 const OTHER_TYPES = {{ other_types | tojson }};
 const INC_OTHER  = {{ inc_other | tojson }};
 const EXP_CATS   = {{ exp_cats | tojson }};
-const EXP_ROWS   = {{ exp_rows | tojson }};
+// All 4 stream expense datasets
+const EXP_DATA = {
+  total:    {{ exp_rows    | tojson }},
+  casetta:  {{ exp_rows_casetta  | tojson }},
+  farm:     {{ exp_rows_farm     | tojson }},
+  personal: {{ exp_rows_personal | tojson }},
+};
+const EXP_STREAM_TOTALS = {
+  total:    {{ exp_total    | tojson }},
+  casetta:  {{ exp_casetta  | tojson }},
+  farm:     {{ exp_farm     | tojson }},
+  personal: {{ exp_personal | tojson }},
+};
+const STREAM_LABELS = { total:'All', casetta:'Casetta', farm:'Farm', personal:'Personal' };
+const STREAM_COLORS = { total:'#3c2415', casetta:'#4a90d9', farm:'#5cb85c', personal:'#f0ad4e' };
 
-// Colour palette
+let currentStream = 'total';
+
 const PALETTE = ['#3c2415','#c9a87a','#5b8c5a','#2e6da4','#a85c32','#7a5c8c','#2e8c7a','#8c2e2e','#5c7a2e','#4a4a6a'];
 
 function fmt(v) {
@@ -337,15 +427,138 @@ function fmt(v) {
   return '€' + Math.round(v).toLocaleString('en-IE');
 }
 
+function sumArr(arr) { return arr.reduce((a,b)=>a+(b||0),0); }
+
+// ── Stream switching ──────────────────────────────────────────────────────────
+function setStream(stream) {
+  currentStream = stream;
+  const label = STREAM_LABELS[stream];
+  const col   = STREAM_COLORS[stream];
+
+  // Update stream selector buttons
+  document.querySelectorAll('.stream-btn').forEach(b => {
+    const active = b.dataset.stream === stream;
+    b.classList.toggle('active', active);
+    if (active) {
+      b.style.background = col; b.style.color = '#fff'; b.style.borderColor = col;
+    } else {
+      b.style.background = ''; b.style.color = STREAM_COLORS[b.dataset.stream];
+      b.style.borderColor = STREAM_COLORS[b.dataset.stream];
+    }
+  });
+
+  // Update stream label
+  const streamNames = { total:'all costs combined', casetta:'Casetta (Agritourism) costs only',
+                        farm:'Farm costs only', personal:'Personal costs only' };
+  document.getElementById('streamLabel').textContent = 'Showing ' + streamNames[stream];
+  document.getElementById('kpiStreamLabel').textContent = '(' + label + ')';
+  document.getElementById('kpiProfitStream').textContent = '(' + label + ')';
+  document.getElementById('expTabStreamLabel').textContent = label;
+
+  // Update KPI cards
+  const expTot = sumArr(EXP_STREAM_TOTALS[stream]);
+  const incTot = sumArr(INC_TOTAL);
+  const profit = incTot - expTot;
+  const margin = incTot ? (profit/incTot*100).toFixed(1) : 0;
+  document.getElementById('kpiCosts').textContent  = '€' + Math.round(expTot).toLocaleString('en-IE');
+  document.getElementById('kpiProfit').textContent = '€' + Math.round(profit).toLocaleString('en-IE');
+  document.getElementById('kpiProfit').className   = 'fw-bold fs-4 ' + (profit >= 0 ? 'text-success' : 'text-danger');
+  document.getElementById('kpiMargin').textContent = margin + '%';
+
+  // Update P&L chart
+  const expStream = EXP_STREAM_TOTALS[stream];
+  const profitArr = INC_TOTAL.map((v, i) => v - (expStream[i] || 0));
+  plChart.data.datasets[1].data = expStream;
+  plChart.data.datasets[2].data = profitArr;
+  plChart.data.datasets[1].label = 'Expenses (' + label + ')';
+  plChart.update();
+
+  // Update P&L stream label
+  const plLbl = document.getElementById('plStreamLabel');
+  if (plLbl) plLbl.textContent = label;
+
+  // Rebuild P&L expense rows
+  rebuildPLExpRows(stream);
+
+  // Update expense table rows
+  rebuildExpTable(stream);
+
+  // Update expense chart
+  expChart.data.datasets = EXP_CATS.map((c, i) => ({
+    label: c, data: EXP_DATA[stream][c] || Array(12).fill(0),
+    backgroundColor: PALETTE[i % PALETTE.length], stack: 's'
+  }));
+  expChart.update();
+}
+
+function rebuildPLExpRows(stream) {
+  const body = document.getElementById('plExpBody');
+  const totalRow = document.getElementById('plExpTotal');
+  const profitRow = document.getElementById('plProfitRow');
+  const marginRow = document.getElementById('plMarginRow');
+  if (!body) return;
+
+  const expRows = EXP_DATA[stream];
+  const expTotals = EXP_STREAM_TOTALS[stream];
+
+  // Category rows
+  body.innerHTML = EXP_CATS.map(cat => {
+    const vals = expRows[cat] || Array(12).fill(0);
+    const tot = sumArr(vals);
+    const cells = vals.map(v => `<td class="text-end">${v ? fmt(v) : '—'}</td>`).join('');
+    return `<tr><td class="ps-3 text-muted">${cat}</td>${cells}<td class="text-end fw-bold">${fmt(tot)}</td></tr>`;
+  }).join('');
+
+  // Total expenses row
+  const totCells = expTotals.map(v => `<td class="text-end">${v ? fmt(v) : '—'}</td>`).join('');
+  totalRow.innerHTML = `<td>Total Expenses</td>${totCells}<td class="text-end">${fmt(sumArr(expTotals))}</td>`;
+
+  // Profit row
+  const profitArr = INC_TOTAL.map((v, i) => v - (expTotals[i] || 0));
+  const profitCells = profitArr.map(v => {
+    const cls = v < 0 ? ' class="text-warning"' : '';
+    return `<td class="text-end fw-bold"${cls}>${fmt(v)}</td>`;
+  }).join('');
+  const totalProfit = sumArr(profitArr);
+  profitRow.innerHTML = `<td class="fw-bold">NET PROFIT</td>${profitCells}<td class="text-end fw-bold">${fmt(totalProfit)}</td>`;
+
+  // Margin row
+  const totalInc = sumArr(INC_TOTAL);
+  const marginCells = profitArr.map((p, i) => {
+    const m = INC_TOTAL[i] ? (p / INC_TOTAL[i] * 100).toFixed(1) : 0;
+    return `<td class="text-end text-muted">${m}%</td>`;
+  }).join('');
+  const totMargin = totalInc ? (totalProfit / totalInc * 100).toFixed(1) : 0;
+  marginRow.innerHTML = `<td class="text-muted">Margin %</td>${marginCells}<td class="text-end fw-bold">${totMargin}%</td>`;
+}
+
+function rebuildExpTable(stream) {
+  const body = document.getElementById('expTableBody');
+  if (!body) return;
+  const rows = EXP_CATS.map(cat => {
+    const vals = EXP_DATA[stream][cat] || Array(12).fill(0);
+    const total = sumArr(vals);
+    const cells = vals.map(v => `<td class="text-end">${v ? fmt(v) : '—'}</td>`).join('');
+    return `<tr><td class="ps-2">${cat}</td>${cells}<td class="text-end fw-bold">${fmt(total)}</td></tr>`;
+  });
+  // Grand total row
+  const gtVals = EXP_STREAM_TOTALS[stream];
+  const gtTotal = sumArr(gtVals);
+  const gtCells = gtVals.map(v => `<td class="text-end">${v ? fmt(v) : '—'}</td>`).join('');
+  rows.push(`<tr class="table-danger fw-bold"><td>TOTAL EXPENSES</td>${gtCells}<td class="text-end">${fmt(gtTotal)}</td></tr>`);
+  body.innerHTML = rows.join('');
+}
+
 // ── P&L Chart (Dashboard) ─────────────────────────────────────────────────────
-new Chart(document.getElementById('plChart'), {
+const plChart = new Chart(document.getElementById('plChart'), {
   type: 'bar',
   data: {
     labels: MONTHS,
     datasets: [
-      { label: 'Income',   data: INC_TOTAL,  backgroundColor: 'rgba(90,140,90,.7)',  order: 2 },
-      { label: 'Expenses', data: EXP_TOTAL,  backgroundColor: 'rgba(220,53,69,.6)',  order: 2 },
-      { label: 'Profit',   data: PROFIT,     type: 'line', borderColor: '#c9a87a',
+      { label: 'Income',   data: INC_TOTAL,               backgroundColor: 'rgba(90,140,90,.7)',  order: 2 },
+      { label: 'Expenses (All)', data: EXP_STREAM_TOTALS.total, backgroundColor: 'rgba(220,53,69,.6)',  order: 2 },
+      { label: 'Profit',   data: INC_TOTAL.map((v,i) => v - (EXP_STREAM_TOTALS.total[i]||0)),
+        type: 'line', borderColor: '#c9a87a',
         backgroundColor: 'rgba(201,168,122,.15)', fill: true, tension: 0.3, order: 1,
         pointBackgroundColor: '#c9a87a', pointRadius: 4 }
     ]
@@ -359,9 +572,9 @@ new Chart(document.getElementById('plChart'), {
 });
 
 // ── Income mix donut (Dashboard) ─────────────────────────────────────────────
-const accomTotal  = INC_ACCOM.reduce((a,b) => a+b, 0);
-const drinksTotal = INC_DRINKS.reduce((a,b) => a+b, 0);
-const otherTotals = OTHER_TYPES.map(t => INC_OTHER[t].reduce((a,b)=>a+b,0));
+const accomTotal  = sumArr(INC_ACCOM);
+const drinksTotal = sumArr(INC_DRINKS);
+const otherTotals = OTHER_TYPES.map(t => sumArr(INC_OTHER[t]));
 const mixLabels   = ['Accommodation', 'Drink Sales', ...OTHER_TYPES];
 const mixData     = [accomTotal, drinksTotal, ...otherTotals];
 
@@ -370,6 +583,25 @@ new Chart(document.getElementById('mixChart'), {
   data: {
     labels: mixLabels,
     datasets: [{ data: mixData, backgroundColor: PALETTE.slice(0, mixLabels.length), borderWidth: 2 }]
+  },
+  options: {
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12 } },
+      tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmt(ctx.raw) } }
+    }
+  }
+});
+
+// ── Stream cost donut ─────────────────────────────────────────────────────────
+new Chart(document.getElementById('streamDonut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Casetta', 'Farm', 'Personal'],
+    datasets: [{
+      data: [sumArr(EXP_STREAM_TOTALS.casetta), sumArr(EXP_STREAM_TOTALS.farm), sumArr(EXP_STREAM_TOTALS.personal)],
+      backgroundColor: ['#4a90d9', '#5cb85c', '#f0ad4e'],
+      borderWidth: 2
+    }]
   },
   options: {
     plugins: {
@@ -400,13 +632,15 @@ new Chart(document.getElementById('incomeChart'), {
 });
 
 // ── Expense trend chart ───────────────────────────────────────────────────────
-const expDatasets = EXP_CATS.map((c, i) => ({
-  label: c, data: EXP_ROWS[c], backgroundColor: PALETTE[i % PALETTE.length], stack: 's'
-}));
-
-new Chart(document.getElementById('expChart'), {
+const expChart = new Chart(document.getElementById('expChart'), {
   type: 'bar',
-  data: { labels: MONTHS, datasets: expDatasets },
+  data: {
+    labels: MONTHS,
+    datasets: EXP_CATS.map((c, i) => ({
+      label: c, data: EXP_DATA.total[c] || Array(12).fill(0),
+      backgroundColor: PALETTE[i % PALETTE.length], stack: 's'
+    }))
+  },
   options: {
     responsive: true, maintainAspectRatio: true,
     plugins: { legend: { position: 'bottom' },
@@ -415,10 +649,19 @@ new Chart(document.getElementById('expChart'), {
   }
 });
 
+// ── Stream button wiring ──────────────────────────────────────────────────────
+document.querySelectorAll('.stream-btn').forEach(btn => {
+  btn.addEventListener('click', () => setStream(btn.dataset.stream));
+});
+
 // ── Month drilldown ───────────────────────────────────────────────────────────
 function drillMonth(ym, label) {
-  const mi = {{ months | tojson }}.indexOf(ym);
+  const mi = YM_LIST.indexOf(ym);
   if (mi < 0) return;
+
+  const expRows = EXP_DATA[currentStream];
+  const expStreamTotals = EXP_STREAM_TOTALS[currentStream];
+  const streamLabel = STREAM_LABELS[currentStream];
 
   const rows = [];
 
@@ -430,14 +673,14 @@ function drillMonth(ym, label) {
   const totalInc = INC_TOTAL[mi];
   rows.push(['<strong>Total Income</strong>', `<strong>${fmt(totalInc)}</strong>`, '']);
 
-  // Expenses
-  rows.push(['<strong style="color:#dc3545">EXPENSES</strong>', '', '']);
-  EXP_CATS.forEach(c => rows.push([c, fmt(EXP_ROWS[c][mi]), '']));
-  const totalExp = EXP_TOTAL[mi];
+  // Expenses (stream-filtered)
+  rows.push([`<strong style="color:#dc3545">EXPENSES (${streamLabel})</strong>`, '', '']);
+  EXP_CATS.forEach(c => rows.push([c, fmt((expRows[c] || [])[mi] || 0), '']));
+  const totalExp = expStreamTotals[mi] || 0;
   rows.push(['<strong>Total Expenses</strong>', `<strong>${fmt(totalExp)}</strong>`, '']);
 
   // Profit
-  const p = PROFIT[mi];
+  const p = totalInc - totalExp;
   const pColor = p >= 0 ? '#198754' : '#dc3545';
   rows.push([`<strong style="color:${pColor}">NET PROFIT</strong>`,
              `<strong style="color:${pColor}">${fmt(p)}</strong>`, '']);
@@ -447,7 +690,7 @@ function drillMonth(ym, label) {
     <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td class="text-end">${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>
   </table>`;
 
-  document.getElementById('drillTitle').textContent = label + ' {{ year }} — Detail';
+  document.getElementById('drillTitle').textContent = label + ' {{ year }} — ' + streamLabel + ' Detail';
   document.getElementById('drillBody').innerHTML = html;
   document.getElementById('drillPanel').style.display = '';
   document.getElementById('drillPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });

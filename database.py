@@ -359,7 +359,45 @@ def init_db():
             total REAL DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS expense_category_splits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT UNIQUE NOT NULL,
+            pct_casetta REAL DEFAULT 1.0,
+            pct_farm REAL DEFAULT 0.0,
+            pct_personal REAL DEFAULT 0.0
+        );
     """)
+
+    # Migration: add split columns to expense_suppliers if not present
+    for col, default in [("pct_casetta", "1.0"), ("pct_farm", "0.0"), ("pct_personal", "0.0")]:
+        try:
+            c.execute(f"ALTER TABLE expense_suppliers ADD COLUMN {col} REAL DEFAULT {default}")
+        except Exception:
+            pass  # column already exists
+
+    # Seed category-level splits
+    category_split_seeds = [
+        ("UTILITIES",                        0.10, 0.00, 0.90),
+        ("VEHICLE",                          0.00, 0.00, 1.00),
+        ("TAX",                              0.95, 0.00, 0.05),
+        ("DIGITAL OFFICE & HOME SUPPLIES:",  0.00, 0.00, 1.00),
+        ("STAFF",                            1.00, 0.00, 0.00),
+        ("INSURANCE:",                       0.00, 1.00, 0.00),
+        ("CONSULTANTS",                      0.00, 1.00, 0.00),
+        ("MARKETING",                        1.00, 0.00, 0.00),
+        ("MAINTENANCE SUPPLIERS",            1.00, 0.00, 0.00),
+        ("PRODUCE / FOOD COSTS",             1.00, 0.00, 0.00),
+        ("SUPPLIERS",                        0.00, 1.00, 0.00),
+        ("PERSONAL:",                        0.00, 0.00, 1.00),
+        ("BUSINESS EXP & ENRICHMENT COSTS", 1.00, 0.00, 0.00),
+        ("CAPITAL PROJECTS",                 1.00, 0.00, 0.00),
+    ]
+    for cat, pc, pf, pp in category_split_seeds:
+        c.execute("""
+            INSERT OR IGNORE INTO expense_category_splits (category, pct_casetta, pct_farm, pct_personal)
+            VALUES (?,?,?,?)
+        """, (cat, pc, pf, pp))
 
     # Seed other_income_categories if empty
     if not c.execute("SELECT 1 FROM other_income_categories LIMIT 1").fetchone():
@@ -745,6 +783,95 @@ def init_db():
             c.execute("INSERT OR IGNORE INTO expense_suppliers (category, name) VALUES (?,?)", (cat, name))
         except Exception:
             pass
+
+    # Seed supplier-level splits (only where they differ from category default)
+    SUPPLIER_SPLIT_SEEDS = [
+        # UTILITIES sub-items
+        ("UTILITIES",     "Electricity",                        0.00, 0.00, 1.00),
+        ("UTILITIES",     "Gas",                               0.00, 0.00, 1.00),
+        ("UTILITIES",     "Wood",                              0.00, 1.00, 0.00),
+        ("UTILITIES",     "Publiacqua",                        0.00, 1.00, 0.00),
+        ("UTILITIES",     "Car Fuel",                          0.00, 1.00, 0.00),
+        # TAX sub-items
+        ("TAX",           "Car",                               0.00, 0.00, 1.00),
+        ("TAX",           "Road Tax",                          1.00, 0.00, 0.00),
+        ("TAX",           "Tractor",                           1.00, 0.00, 0.00),
+        ("TAX",           "John Deere",                        1.00, 0.00, 0.00),
+        ("TAX",           "Lorry",                             1.00, 0.00, 0.00),
+        ("TAX",           "Social and Pension Tax (INPS)",     1.00, 0.00, 0.00),
+        ("TAX",           "Property Tax (IMU)",                1.00, 0.00, 0.00),
+        ("TAX",           "Consorzio Bonifica",                1.00, 0.00, 0.00),
+        ("TAX",           "IRPEF Personal Income tax (=25%)",  0.00, 0.00, 1.00),
+        ("TAX",           "IRAP local regional tax",           0.50, 0.00, 0.50),
+        ("TAX",           "VAT (IVA)",                        0.50, 0.00, 0.50),
+        ("TAX",           "Chamber of Commerce Registration",  0.00, 0.00, 1.00),
+        ("TAX",           "IRPEF STAFF-(tax on their income)", 0.70, 0.00, 0.30),
+        ("TAX",           "INPS STAFF-(Social & pension)",     0.00, 0.00, 1.00),
+        ("TAX",           "TARI (Alia)",                       0.00, 0.00, 1.00),
+        # STAFF sub-items
+        ("STAFF",         "Liliana",                           1.00, 0.00, 0.00),
+        ("STAFF",         "Claudia",                           1.00, 0.00, 0.00),
+        ("STAFF",         "Patrizia",                          1.00, 0.00, 0.00),
+        ("STAFF",         "Arianna",                           1.00, 0.00, 0.00),
+        ("STAFF",         "Jeffrey Thickman",                  1.00, 0.00, 0.00),
+        ("STAFF",         "Elisa",                             0.75, 0.25, 0.00),
+        ("STAFF",         "Salvatore",                         0.30, 0.70, 0.00),
+        ("STAFF",         "Gabriele",                          1.00, 0.00, 0.00),
+        ("STAFF",         "Francesca & Giuditta",              1.00, 0.00, 0.00),
+        ("STAFF",         "Noemi",                             1.00, 0.00, 0.00),
+        ("STAFF",         "Angela",                            1.00, 0.00, 0.00),
+        ("STAFF",         "Melu",                              0.00, 1.00, 0.00),
+        # INSURANCE sub-items
+        ("INSURANCE:",    "Agriturismo Insurance",             1.00, 0.00, 0.00),
+        ("INSURANCE:",    "Tractor Insurance",                 0.00, 1.00, 0.00),
+        ("INSURANCE:",    "Car Insurance",                     0.00, 0.00, 1.00),
+        ("INSURANCE:",    "Lorry",                             0.00, 1.00, 0.00),
+        ("INSURANCE:",    "Trailer Cart",                      0.00, 1.00, 0.00),
+        # CONSULTANTS sub-items
+        ("CONSULTANTS",   "Marranci Lorenzo",                  0.60, 0.40, 0.00),
+        ("CONSULTANTS",   "Studio Arcadia SRL",                0.80, 0.20, 0.00),
+        ("CONSULTANTS",   "Dott. Manfreddi Bufalini",          0.90, 0.10, 0.00),
+        ("CONSULTANTS",   "Agriconsulting",                    0.00, 1.00, 0.00),
+        ("CONSULTANTS",   "BGS Services SRL",                  0.80, 0.20, 0.00),
+        ("CONSULTANTS",   "Francesco Steidl",                  0.00, 0.00, 1.00),
+        # MAINTENANCE SUPPLIERS - farm contractors
+        ("MAINTENANCE SUPPLIERS", "Farm Contractor (Eleonorii)", 0.00, 1.00, 0.00),
+        ("MAINTENANCE SUPPLIERS", "Eden Garden",                 0.00, 1.00, 0.00),
+        ("MAINTENANCE SUPPLIERS", "Scarabelli Irrigation SRL",   0.00, 1.00, 0.00),
+        ("MAINTENANCE SUPPLIERS", "Andrea Irrigation",           0.00, 1.00, 0.00),
+        ("MAINTENANCE SUPPLIERS", "Gamberini Gianluca (Mega Pruning)", 0.00, 1.00, 0.00),
+        ("MAINTENANCE SUPPLIERS", "Milli Massimiliano",          0.00, 1.00, 0.00),
+        # SUPPLIERS - farm vs casetta
+        ("SUPPLIERS",     "Ilio Palmieri",                     0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Vivaio (Plants)",                   0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Amazon",                            0.50, 0.50, 0.00),
+        ("SUPPLIERS",     "Sunchemicals",                      0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Olmo Casa SRL",                     0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Bernino Commerciali",               0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Officina Cirri srl",                0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "S.Agri.Vit. Srl",                   0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Az Agr Stoppioni",                  0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Cioni",                             0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "SOCEPI Srl",                        0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "G.M.V Agricentre",                  0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Oliviicoltori Toscani Associati",   0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Alderighi",                         0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Eden Park",                         0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Pixart",                            0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Mailboxes Oil",                     0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Mailboxes Personal",                0.00, 0.00, 1.00),
+        ("SUPPLIERS",     "Consorzio Dell'Olio Toscano",       0.00, 1.00, 0.00),
+        ("SUPPLIERS",     "Patrizia Anichini",                 1.00, 0.00, 0.00),
+        # CAPITAL PROJECTS
+        ("CAPITAL PROJECTS", "Agriturismo",                    1.00, 0.00, 0.00),
+        ("CAPITAL PROJECTS", "Farm",                           0.00, 1.00, 0.00),
+    ]
+    for cat, name, pc, pf, pp in SUPPLIER_SPLIT_SEEDS:
+        c.execute("""
+            UPDATE expense_suppliers SET pct_casetta=?, pct_farm=?, pct_personal=?
+            WHERE category=? AND name=?
+        """, (pc, pf, pp, cat, name))
+
     conn.commit()
 
     # Seed default users if none exist

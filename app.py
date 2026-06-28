@@ -629,13 +629,26 @@ def expenses():
     years = conn.execute("SELECT DISTINCT year FROM expenses ORDER BY year DESC").fetchall()
 
     sup_rows = conn.execute(
-        "SELECT id, category, name FROM expense_suppliers WHERE active=1 ORDER BY category, name"
+        "SELECT id, category, name, pct_casetta, pct_farm, pct_personal FROM expense_suppliers WHERE active=1 ORDER BY category, name"
+    ).fetchall()
+    cat_split_rows = conn.execute(
+        "SELECT category, pct_casetta, pct_farm, pct_personal FROM expense_category_splits"
     ).fetchall()
     conn.close()
 
     suppliers_by_cat = {}
     for row in sup_rows:
-        suppliers_by_cat.setdefault(row["category"], []).append({"id": row["id"], "name": row["name"]})
+        suppliers_by_cat.setdefault(row["category"], []).append({
+            "id": row["id"], "name": row["name"],
+            "pct_casetta": row["pct_casetta"] if row["pct_casetta"] is not None else 1.0,
+            "pct_farm":    row["pct_farm"]    if row["pct_farm"]    is not None else 0.0,
+            "pct_personal":row["pct_personal"]if row["pct_personal"]is not None else 0.0,
+        })
+    cat_splits = {r["category"]: {
+        "pct_casetta": r["pct_casetta"] if r["pct_casetta"] is not None else 1.0,
+        "pct_farm":    r["pct_farm"]    if r["pct_farm"]    is not None else 0.0,
+        "pct_personal":r["pct_personal"]if r["pct_personal"]is not None else 0.0,
+    } for r in cat_split_rows}
 
     return render_template("expenses.html",
         tab=tab,
@@ -647,6 +660,7 @@ def expenses():
         year_filter=year_filter,
         today=date.today().isoformat(),
         suppliers_by_cat=suppliers_by_cat,
+        cat_splits=cat_splits,
         cat_filter=cat_filter,
     )
 
@@ -717,6 +731,46 @@ def add_expense_supplier():
         conn.close()
         flash(f"Added '{name}'.", "success")
     return redirect(url_for("expenses", tab="maintenance", cat=category))
+
+
+@app.route("/expenses/suppliers/splits/<int:supplier_id>", methods=["POST"])
+@login_required
+def update_supplier_splits(supplier_id):
+    """Save Casetta/Farm/Personal split % for a supplier (called via fetch)."""
+    data = request.get_json(force=True)
+    pc = float(data.get("pct_casetta", 0))
+    pf = float(data.get("pct_farm", 0))
+    pp = float(data.get("pct_personal", 0))
+    conn = get_db()
+    conn.execute("""
+        UPDATE expense_suppliers SET pct_casetta=?, pct_farm=?, pct_personal=? WHERE id=?
+    """, (pc, pf, pp, supplier_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/expenses/category-splits", methods=["POST"])
+@login_required
+def update_category_splits():
+    """Save Casetta/Farm/Personal split % for a category (called via fetch)."""
+    data = request.get_json(force=True)
+    category = data.get("category", "")
+    pc = float(data.get("pct_casetta", 0))
+    pf = float(data.get("pct_farm", 0))
+    pp = float(data.get("pct_personal", 0))
+    if not category:
+        return jsonify({"ok": False, "error": "no category"}), 400
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO expense_category_splits (category, pct_casetta, pct_farm, pct_personal)
+        VALUES (?,?,?,?)
+        ON CONFLICT(category) DO UPDATE SET pct_casetta=excluded.pct_casetta,
+            pct_farm=excluded.pct_farm, pct_personal=excluded.pct_personal
+    """, (category, pc, pf, pp))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/expenses/suppliers/delete/<int:supplier_id>", methods=["POST"])
@@ -1207,17 +1261,53 @@ def accounting():
     for r in other_rows:
         other.setdefault(r["type"], {})[r["ym"]] = r["total"]
 
-    # ── Expenses — by month AND by category ──
-    exp_rows = conn.execute("""
-        SELECT strftime('%Y-%m', date) AS ym, category, SUM(amount) AS total
+    # ── Expenses — by month, category AND sub_category (for split lookup) ──
+    raw_exp_rows = conn.execute("""
+        SELECT strftime('%Y-%m', date) AS ym, category, sub_category, SUM(amount) AS total
         FROM expenses WHERE strftime('%Y', date)=?
-        GROUP BY ym, category
+        GROUP BY ym, category, sub_category
     """, (str(year),)).fetchall()
-    exp_cats = sorted(set(r["category"] for r in exp_rows))
-    # expenses[category][ym] = total
-    expenses = {}
-    for r in exp_rows:
-        expenses.setdefault(r["category"], {})[r["ym"]] = r["total"]
+
+    # Load split tables
+    sup_split_map = {
+        (r["category"], r["name"]): (
+            r["pct_casetta"] if r["pct_casetta"] is not None else 1.0,
+            r["pct_farm"]    if r["pct_farm"]    is not None else 0.0,
+            r["pct_personal"]if r["pct_personal"]is not None else 0.0,
+        )
+        for r in conn.execute(
+            "SELECT category, name, pct_casetta, pct_farm, pct_personal FROM expense_suppliers"
+        ).fetchall()
+    }
+    cat_split_map = {
+        r["category"]: (
+            r["pct_casetta"] if r["pct_casetta"] is not None else 1.0,
+            r["pct_farm"]    if r["pct_farm"]    is not None else 0.0,
+            r["pct_personal"]if r["pct_personal"]is not None else 0.0,
+        )
+        for r in conn.execute(
+            "SELECT category, pct_casetta, pct_farm, pct_personal FROM expense_category_splits"
+        ).fetchall()
+    }
+
+    exp_cats = sorted(set(r["category"] for r in raw_exp_rows))
+    # expenses[stream][category][ym] = total  (stream: 'total','casetta','farm','personal')
+    expenses = {s: {} for s in ("total", "casetta", "farm", "personal")}
+    for r in raw_exp_rows:
+        cat  = r["category"]
+        sub  = r["sub_category"] or ""
+        ym   = r["ym"]
+        amt  = r["total"] or 0
+        key  = (cat, sub)
+        if key in sup_split_map:
+            pc, pf, pp = sup_split_map[key]
+        elif cat in cat_split_map:
+            pc, pf, pp = cat_split_map[cat]
+        else:
+            pc, pf, pp = 1.0, 0.0, 0.0
+        for stream, pct in [("total", 1.0), ("casetta", pc), ("farm", pf), ("personal", pp)]:
+            expenses[stream].setdefault(cat, {}).setdefault(ym, 0)
+            expenses[stream][cat][ym] += amt * pct
 
     # ── Available years (union across all tables) ──
     yrs_sql = """
@@ -1245,13 +1335,24 @@ def accounting():
         t = inc_accom[i] + inc_drinks[i] + sum(inc_other[ot][i] for ot in other_types)
         inc_total.append(t)
 
-    # Expense rows per month
-    exp_rows_data = {c: month_vals(expenses.get(c, {}), months) for c in exp_cats}
-    exp_total = []
-    for i in range(12):
-        exp_total.append(sum(exp_rows_data[c][i] for c in exp_cats))
+    # Expense rows per month — 4 streams: total, casetta, farm, personal
+    def build_exp_rows(stream):
+        return {c: month_vals(expenses[stream].get(c, {}), months) for c in exp_cats}
 
-    # Profit
+    exp_rows_data     = build_exp_rows("total")
+    exp_rows_casetta  = build_exp_rows("casetta")
+    exp_rows_farm     = build_exp_rows("farm")
+    exp_rows_personal = build_exp_rows("personal")
+
+    def stream_total(rows):
+        return [sum(rows[c][i] for c in exp_cats) for i in range(12)]
+
+    exp_total     = stream_total(exp_rows_data)
+    exp_casetta   = stream_total(exp_rows_casetta)
+    exp_farm      = stream_total(exp_rows_farm)
+    exp_personal  = stream_total(exp_rows_personal)
+
+    # Profit (all streams vs total income)
     profit = [inc_total[i] - exp_total[i] for i in range(12)]
     margin = [round(profit[i]/inc_total[i]*100, 1) if inc_total[i] else 0 for i in range(12)]
 
@@ -1268,10 +1369,16 @@ def accounting():
         inc_other=inc_other,
         other_types=other_types,
         inc_total=inc_total,
-        # Expenses
+        # Expenses — all streams
         exp_rows=exp_rows_data,
-        exp_cats=exp_cats,
+        exp_rows_casetta=exp_rows_casetta,
+        exp_rows_farm=exp_rows_farm,
+        exp_rows_personal=exp_rows_personal,
         exp_total=exp_total,
+        exp_casetta=exp_casetta,
+        exp_farm=exp_farm,
+        exp_personal=exp_personal,
+        exp_cats=exp_cats,
         # P&L
         profit=profit,
         margin=margin,

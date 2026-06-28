@@ -318,6 +318,22 @@
 <!-- ══════════════════ MAINTENANCE TAB ══════════════════ -->
 {% elif tab == 'maintenance' %}
 
+<!-- Sub-tabs for Suppliers vs Category Splits -->
+<ul class="nav nav-pills mb-3" id="maintSubTabs">
+  <li class="nav-item">
+    <a class="nav-link active" id="pill-suppliers" href="#" onclick="showMaintTab('suppliers');return false">
+      <i class="bi bi-people me-1"></i>Suppliers
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="pill-catsplits" href="#" onclick="showMaintTab('catsplits');return false">
+      <i class="bi bi-pie-chart me-1"></i>Category Defaults
+    </a>
+  </li>
+</ul>
+
+<!-- ── SUPPLIERS PANEL ── -->
+<div id="panel-suppliers">
 <div class="row g-4">
   <div class="col-lg-3">
     <div class="card">
@@ -343,17 +359,50 @@
     <div class="supplier-section card mb-3" data-cat="{{ c }}" style="display:none">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-tag me-2"></i>{{ c }}</span>
-        <span class="badge bg-secondary">{{ suppliers_by_cat.get(c, [])|length }} suppliers</span>
+        <small class="text-white-50">Edit % split per supplier — must sum to 100</small>
       </div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Supplier / Sub-category</th>
+              <th class="text-center" style="width:90px">
+                <span class="badge" style="background:#4a90d9">Casetta %</span>
+              </th>
+              <th class="text-center" style="width:90px">
+                <span class="badge" style="background:#5cb85c">Farm %</span>
+              </th>
+              <th class="text-center" style="width:90px">
+                <span class="badge" style="background:#f0ad4e">Personal %</span>
+              </th>
+              <th style="width:90px"></th>
+            </tr>
+          </thead>
           <tbody>
             {% for s in suppliers_by_cat.get(c, []) %}
-            <tr>
-              <td>{{ s.name }}</td>
-              <td style="width:80px">
+            <tr data-sid="{{ s.id }}">
+              <td class="align-middle">{{ s.name }}</td>
+              <td class="text-center px-1">
+                <input type="number" class="form-control form-control-sm text-center split-input"
+                       data-field="pct_casetta" value="{{ (s.pct_casetta * 100)|round(0)|int }}"
+                       min="0" max="100" step="1" style="width:70px;display:inline-block">
+              </td>
+              <td class="text-center px-1">
+                <input type="number" class="form-control form-control-sm text-center split-input"
+                       data-field="pct_farm" value="{{ (s.pct_farm * 100)|round(0)|int }}"
+                       min="0" max="100" step="1" style="width:70px;display:inline-block">
+              </td>
+              <td class="text-center px-1">
+                <input type="number" class="form-control form-control-sm text-center split-input"
+                       data-field="pct_personal" value="{{ (s.pct_personal * 100)|round(0)|int }}"
+                       min="0" max="100" step="1" style="width:70px;display:inline-block">
+              </td>
+              <td class="text-center align-middle">
+                <button class="btn btn-sm btn-success py-0 px-2 save-split-btn" title="Save splits">
+                  <i class="bi bi-check-lg"></i>
+                </button>
                 <form method="POST" action="/expenses/suppliers/delete/{{ s.id }}"
-                      onsubmit="return confirm('Remove {{ s.name }}?')">
+                      onsubmit="return confirm('Remove {{ s.name }}?')" style="display:inline">
                   <button class="btn btn-sm btn-outline-danger py-0 px-2">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -361,7 +410,7 @@
               </td>
             </tr>
             {% else %}
-            <tr><td class="text-muted small py-2">No suppliers yet.</td></tr>
+            <tr><td colspan="5" class="text-muted small py-2">No suppliers yet.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -385,6 +434,65 @@
     </div>
   </div>
 </div>
+</div><!-- /panel-suppliers -->
+
+<!-- ── CATEGORY SPLITS PANEL ── -->
+<div id="panel-catsplits" style="display:none">
+  <div class="card">
+    <div class="card-header">
+      Category Default Splits
+      <small class="text-white-50 ms-2">— Applied when a specific supplier split is not set</small>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="text-center" style="width:120px">
+              <span class="badge" style="background:#4a90d9">Casetta %</span>
+            </th>
+            <th class="text-center" style="width:120px">
+              <span class="badge" style="background:#5cb85c">Farm %</span>
+            </th>
+            <th class="text-center" style="width:120px">
+              <span class="badge" style="background:#f0ad4e">Personal %</span>
+            </th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in categories %}
+          {% set sp = cat_splits.get(c, {'pct_casetta': 1.0, 'pct_farm': 0.0, 'pct_personal': 0.0}) %}
+          <tr data-category="{{ c }}">
+            <td class="align-middle fw-semibold">{{ c }}</td>
+            <td class="text-center px-1">
+              <input type="number" class="form-control form-control-sm text-center cat-split-input"
+                     data-field="pct_casetta" value="{{ (sp.pct_casetta * 100)|round(0)|int }}"
+                     min="0" max="100" step="1" style="width:80px;display:inline-block">
+            </td>
+            <td class="text-center px-1">
+              <input type="number" class="form-control form-control-sm text-center cat-split-input"
+                     data-field="pct_farm" value="{{ (sp.pct_farm * 100)|round(0)|int }}"
+                     min="0" max="100" step="1" style="width:80px;display:inline-block">
+            </td>
+            <td class="text-center px-1">
+              <input type="number" class="form-control form-control-sm text-center cat-split-input"
+                     data-field="pct_personal" value="{{ (sp.pct_personal * 100)|round(0)|int }}"
+                     min="0" max="100" step="1" style="width:80px;display:inline-block">
+            </td>
+            <td class="text-center align-middle">
+              <button class="btn btn-sm btn-success py-0 px-2 save-cat-split-btn" title="Save">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /panel-catsplits -->
+
 {% endif %}
 
 
@@ -582,5 +690,81 @@ function filterSuppliers(cat) {
   const cat = params.get('cat');
   if (cat) filterSuppliers(cat);
 })();
+
+// ── Maintenance sub-tabs ───────────────────────────────
+function showMaintTab(tab) {
+  document.getElementById('panel-suppliers').style.display = tab === 'suppliers' ? '' : 'none';
+  document.getElementById('panel-catsplits').style.display = tab === 'catsplits' ? '' : 'none';
+  document.getElementById('pill-suppliers').classList.toggle('active', tab === 'suppliers');
+  document.getElementById('pill-catsplits').classList.toggle('active', tab === 'catsplits');
+}
+
+// ── Supplier split save ───────────────────────────────
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.save-split-btn');
+  if (!btn) return;
+  const row = btn.closest('tr');
+  const sid = row.dataset.sid;
+  const inputs = row.querySelectorAll('.split-input');
+  const data = {};
+  let sum = 0;
+  inputs.forEach(inp => {
+    const pct = parseInt(inp.value) || 0;
+    data[inp.dataset.field] = pct / 100;
+    sum += pct;
+  });
+  if (sum !== 100) {
+    alert(`Percentages must sum to 100 (currently ${sum})`);
+    return;
+  }
+  fetch(`/expenses/suppliers/splits/${sid}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(r => r.json()).then(res => {
+    if (res.ok) {
+      btn.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+      btn.classList.replace('btn-success', 'btn-outline-success');
+      setTimeout(() => {
+        btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+        btn.classList.replace('btn-outline-success', 'btn-success');
+      }, 1500);
+    }
+  });
+});
+
+// ── Category split save ───────────────────────────────
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.save-cat-split-btn');
+  if (!btn) return;
+  const row = btn.closest('tr');
+  const category = row.dataset.category;
+  const inputs = row.querySelectorAll('.cat-split-input');
+  const data = { category };
+  let sum = 0;
+  inputs.forEach(inp => {
+    const pct = parseInt(inp.value) || 0;
+    data[inp.dataset.field] = pct / 100;
+    sum += pct;
+  });
+  if (sum !== 100) {
+    alert(`Percentages must sum to 100 (currently ${sum})`);
+    return;
+  }
+  fetch('/expenses/category-splits', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(r => r.json()).then(res => {
+    if (res.ok) {
+      btn.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+      btn.classList.replace('btn-success', 'btn-outline-success');
+      setTimeout(() => {
+        btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+        btn.classList.replace('btn-outline-success', 'btn-success');
+      }, 1500);
+    }
+  });
+});
 </script>
 {% endblock %}
