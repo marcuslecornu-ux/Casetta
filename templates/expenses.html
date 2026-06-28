@@ -2,6 +2,10 @@
 {% block title %}Expenses{% endblock %}
 
 {% block content %}
+<style>
+  #exp-tbody tr:hover .row-edit-hint { opacity: 1 !important; }
+  #mgr-tbody tr:hover .row-edit-hint { opacity: 1 !important; }
+</style>
 <div class="section-title"><i class="bi bi-receipt me-2"></i>Expenses</div>
 
 <!-- Tab nav -->
@@ -232,7 +236,11 @@
                   {{ e.status }}
                 </span>
               </td>
-              <td class="text-end fw-bold">€{{ "%.2f"|format(e.amount) }}</td>
+              <td class="text-end fw-bold">
+                €{{ "%.2f"|format(e.amount) }}
+                <i class="bi bi-pencil-square ms-2 text-muted row-edit-hint"
+                   style="opacity:0;font-size:.8rem;pointer-events:none" title="Double-click to edit"></i>
+              </td>
             </tr>
             {% else %}
             <tr><td colspan="6" class="text-center text-muted py-4">No expenses for {{ year_filter }}</td></tr>

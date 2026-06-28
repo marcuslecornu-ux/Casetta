@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Manager Actions — Casetta{% endblock %}
 {% block content %}
+<style>
+  #mgr-tbody tr:hover .row-edit-hint { opacity: 1 !important; }
+</style>
 
 <div class="d-flex align-items-center mb-3 gap-3">
   <h2 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Manager Actions</h2>
@@ -53,6 +56,7 @@
           <th onclick="sortMgr('amount')" style="cursor:pointer;text-align:right;white-space:nowrap">
             Amount € <span id="sort-amount">⇅</span>
           </th>
+          <th style="white-space:nowrap">Action</th>
         </tr>
       </thead>
       <tbody id="mgr-tbody">
@@ -74,7 +78,18 @@
           <td><small>{{ e.category }}</small></td>
           <td><small>{{ e.sub_category or '—' }}</small></td>
           <td><small>{{ e.comments or '' }}</small></td>
-          <td class="text-end fw-bold">€{{ "%.2f"|format(e.amount) }}</td>
+          <td class="text-end fw-bold">
+            €{{ "%.2f"|format(e.amount) }}
+            <i class="bi bi-pencil-square ms-1 text-muted row-edit-hint"
+               style="opacity:0;font-size:.8rem;pointer-events:none" title="Double-click to edit"></i>
+          </td>
+          <td>
+            <button class="btn btn-success btn-sm py-0 px-2 mark-paid-btn"
+                    data-uid="{{ e.uid }}" title="Mark as Paid"
+                    onclick="markPaid(this); event.stopPropagation();">
+              <i class="bi bi-check-circle me-1"></i>Paid
+            </button>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -82,6 +97,7 @@
         <tr style="background:var(--casetta-light)">
           <td colspan="4" class="text-end fw-bold">Total Outstanding</td>
           <td class="text-end fw-bold text-danger">€{{ "%.2f"|format(total) }}</td>
+          <td></td>
         </tr>
       </tfoot>
     </table>
@@ -213,6 +229,42 @@ function deleteMgrExp() {
   if (confirm('Delete this expense? This cannot be undone.')) {
     document.getElementById('deleteMgrForm').submit();
   }
+}
+
+// ── Mark Paid ─────────────────────────────────────────────────
+function markPaid(btn) {
+  var uid = btn.dataset.uid;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+  fetch('/manager/mark-paid/' + uid, { method: 'POST' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      // Remove row from table
+      var row = btn.closest('tr');
+      row.style.transition = 'opacity 0.3s';
+      row.style.opacity    = '0';
+      setTimeout(function() {
+        row.remove();
+        // Update badge in sidebar
+        var badge = document.querySelector('.badge.bg-danger.rounded-pill');
+        if (badge) {
+          var n = parseInt(badge.textContent, 10) - 1;
+          if (n <= 0) badge.remove();
+          else badge.textContent = n;
+        }
+        // Check if table is now empty
+        var tbody = document.getElementById('mgr-tbody');
+        if (tbody && tbody.querySelectorAll('tr').length === 0) {
+          location.reload();
+        }
+      }, 300);
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Paid';
+      alert('Could not update: ' + err.message);
+    });
 }
 </script>
 

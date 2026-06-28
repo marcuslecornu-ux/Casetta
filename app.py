@@ -10,8 +10,35 @@ from datetime import datetime, date
 from database import (get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES,
                        BOOKING_SOURCES, CASETTA_ROOMS, PROPERTIES, LOCATIONS, CATEGORY_CODE_PREFIX)
 
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    _limiter_available = True
+except ImportError:
+    _limiter_available = False
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "casetta-secret-2026-change-in-production")
+_secret = os.environ.get("SECRET_KEY")
+if not _secret:
+    import warnings
+    warnings.warn(
+        "SECRET_KEY environment variable is not set. "
+        "Using insecure fallback — set SECRET_KEY in PythonAnywhere environment variables.",
+        stacklevel=2
+    )
+app.secret_key = _secret or "casetta-secret-2026-change-in-production"
+
+# Rate limiter — brute-force protection on /login (5 attempts / 15 min / IP)
+if _limiter_available:
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],          # no global limit; only apply to /login
+        storage_uri="memory://",
+    )
+    _login_limit = limiter.limit("5 per 15 minutes")
+else:
+    def _login_limit(f): return f  # no-op when flask-limiter not installed
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -90,6 +117,7 @@ def log_action(conn, action_type, entity_type, entity_id, description, detail=No
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
+@_login_limit
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -594,6 +622,19 @@ def manager():
     )
 
 
+@app.route("/manager/mark-paid/<uid>", methods=["POST"])
+@login_required
+def manager_mark_paid(uid):
+    conn = get_db()
+    row = conn.execute("SELECT category, amount FROM expenses WHERE uid=?", (uid,)).fetchone()
+    conn.execute("UPDATE expenses SET status='Paid' WHERE uid=?", (uid,))
+    log_action(conn, "UPDATE", "expense", uid,
+               f"Manager: marked as Paid — {row['category']} €{row['amount']:.2f}" if row else f"Manager: marked {uid} as Paid")
+    conn.commit()
+    conn.close()
+    return ("", 204)
+
+
 @app.route("/manager/edit/<uid>", methods=["POST"])
 @login_required
 def manager_edit_expense(uid):
@@ -644,6 +685,10 @@ def expenses():
             sub_cat      = request.form.get("sub_category", "")
             comments     = request.form.get("comments", "")
             amount       = float(request.form.get("amount", 0))
+            if amount <= 0:
+                flash("Amount must be greater than zero.", "warning")
+                conn.close()
+                return redirect(url_for("expenses", tab="expenses", year=date.today().year))
             status       = request.form.get("status", "Paid")
             entry_date   = request.form.get("entry_date", date.today().isoformat())
             is_recurring = request.form.get("is_recurring") == "1"
@@ -799,16 +844,22 @@ def edit_expense(uid):
     entry_date = request.form.get("entry_date", date.today().isoformat())
     dt = datetime.strptime(exp_date, "%Y-%m-%d")
     conn = get_db()
+    edit_amount = float(request.form.get("amount", 0))
+    if edit_amount <= 0:
+        flash("Amount must be greater than zero.", "warning")
+        return_year   = request.form.get("return_year", str(dt.year))
+        return_status = request.form.get("return_status", "all")
+        return redirect(url_for("expenses", tab="expenses", year=return_year, status=return_status))
     conn.execute("""
         UPDATE expenses
         SET date=?,entry_date=?,category=?,sub_category=?,comments=?,amount=?,status=?,month=?,year=?
         WHERE uid=?
     """, (exp_date, entry_date, request.form.get("category"),
           request.form.get("sub_category",""), request.form.get("comments",""),
-          float(request.form.get("amount",0)), request.form.get("status","Paid"),
+          edit_amount, request.form.get("status","Paid"),
           dt.strftime("%b"), dt.year, uid))
     log_action(conn, "UPDATE", "expense", uid,
-               f"Edited expense: {request.form.get('category')} — €{float(request.form.get('amount',0)):.2f} ({dt.strftime('%b %Y')})")
+               f"Edited expense: {request.form.get('category')} — €{edit_amount:.2f} ({dt.strftime('%b %Y')})")
     conn.commit()
     conn.close()
     flash("Expense updated.", "success")
@@ -1166,18 +1217,6 @@ def admin_audit():
                            f_date=f_date, f_search=f_search)
 
 
-@app.route("/admin/audit/delete/<int:log_id>", methods=["POST"])
-@login_required
-def delete_audit_log(log_id):
-    if not current_user.is_admin:
-        return "Forbidden", 403
-    conn = get_db()
-    conn.execute("DELETE FROM audit_log WHERE id=?", (log_id,))
-    conn.commit()
-    conn.close()
-    return ("", 204)  # silent delete (called via fetch from JS)
-
-
 @app.route("/admin")
 @login_required
 def admin():
@@ -1416,10 +1455,10 @@ def accounting():
     for r in other_rows:
         other.setdefault(r["type"], {})[r["ym"]] = r["total"]
 
-    # ── Expenses — by month, category AND sub_category (for split lookup) ──
+    # ── Expenses — Paid only (Forecast excluded from P&L) ──
     raw_exp_rows = conn.execute("""
         SELECT strftime('%Y-%m', date) AS ym, category, sub_category, SUM(amount) AS total
-        FROM expenses WHERE strftime('%Y', date)=?
+        FROM expenses WHERE strftime('%Y', date)=? AND status='Paid'
         GROUP BY ym, category, sub_category
     """, (str(year),)).fetchall()
 

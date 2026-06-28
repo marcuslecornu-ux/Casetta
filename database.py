@@ -197,7 +197,8 @@ STOCK_ITEMS = [
 def get_db():
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")  # allows concurrent reads with writes
+    conn.execute("PRAGMA journal_mode=WAL")   # allows concurrent reads with writes
+    conn.execute("PRAGMA foreign_keys=ON")    # enforce referential integrity
     return conn
 
 
@@ -417,6 +418,21 @@ def init_db():
         ]
         c.executemany("INSERT OR IGNORE INTO other_income_categories (type, sub_type) VALUES (?,?)", seed_cats)
         conn.commit()
+
+    # Performance indexes — CREATE IF NOT EXISTS is safe to re-run
+    index_migrations = [
+        "CREATE INDEX IF NOT EXISTS idx_expenses_year_status ON expenses(year, status)",
+        "CREATE INDEX IF NOT EXISTS idx_expenses_date       ON expenses(date)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_arrival    ON bookings(arrival)",
+        "CREATE INDEX IF NOT EXISTS idx_sales_date_hosted   ON drink_sales(date, is_hosted)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_movements_item ON stock_movements(item_id)",
+    ]
+    for sql in index_migrations:
+        try:
+            c.execute(sql)
+            conn.commit()
+        except Exception:
+            pass
 
     # Migrations — add columns silently if they don't exist yet
     migrations = [

@@ -138,11 +138,6 @@
                    title="{% if log.action_type == 'DELETE' %}Record deleted{% else %}Go to record{% endif %}">
                   <i class="bi bi-arrow-up-right-square"></i>
                 </a>
-                <button class="btn btn-outline-danger btn-sm"
-                        onclick="deleteLog({{ log.id }}, this)"
-                        title="Delete log entry">
-                  <i class="bi bi-trash"></i>
-                </button>
               </div>
             </td>
           </tr>
@@ -220,17 +215,5 @@ function showDetail(id, detail, entityType, entityId) {
   modal.show();
 }
 
-// ── Silent delete of a log entry ──────────────────────────────────────────────
-async function deleteLog(id, btn) {
-  if (!confirm('Remove this log entry?')) return;
-  const resp = await fetch(`/admin/audit/delete/${id}`, { method: 'POST' });
-  if (resp.ok) {
-    btn.closest('tr').style.opacity = '0.3';
-    btn.closest('tr').style.pointerEvents = 'none';
-    setTimeout(() => btn.closest('tr').remove(), 400);
-  } else {
-    alert('Could not delete entry.');
-  }
-}
 </script>
 {% endblock %}
