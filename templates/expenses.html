@@ -8,7 +8,7 @@
 <ul class="nav nav-tabs mb-4">
   <li class="nav-item">
     <a class="nav-link {% if tab == 'expenses' %}active{% endif %}"
-       href="{{ url_for('expenses', tab='expenses', year=year_filter) }}">
+       href="{{ url_for('expenses', tab='expenses', year=year_filter, status=status_filter) }}">
       <i class="bi bi-list-ul me-1"></i>Expenses
     </a>
   </li>
@@ -139,13 +139,24 @@
 
   <!-- Expense list -->
   <div class="col-lg-8">
-    <!-- Year filter -->
-    <div class="d-flex align-items-center gap-1 flex-wrap mb-3">
+    <!-- Year + Status filters -->
+    <div class="d-flex align-items-center gap-1 flex-wrap mb-2">
       <span class="fw-bold me-1 small">Year:</span>
       {% for y in years %}
-      <a href="{{ url_for('expenses', tab='expenses', year=y) }}"
+      <a href="{{ url_for('expenses', tab='expenses', year=y, status=status_filter) }}"
          class="btn btn-sm {{ 'btn-primary' if y|string == year_filter|string else 'btn-outline-primary' }}">
          {{ y }}
+      </a>
+      {% endfor %}
+    </div>
+    <div class="d-flex align-items-center gap-1 flex-wrap mb-3">
+      <span class="fw-bold me-1 small">Status:</span>
+      {% for s, label in [('all','All'), ('Paid','Paid'), ('Forecast','Forecast')] %}
+      <a href="{{ url_for('expenses', tab='expenses', year=year_filter, status=s) }}"
+         class="btn btn-sm {{ 'btn-success' if s == status_filter and s == 'Paid' else ('btn-warning' if s == status_filter and s == 'Forecast' else ('btn-secondary' if s == status_filter else 'btn-outline-secondary')) }}">
+         {{ label }}
+         {% if s == 'Forecast' %}<i class="bi bi-clock ms-1"></i>{% endif %}
+         {% if s == 'Paid' %}<i class="bi bi-check-circle ms-1"></i>{% endif %}
       </a>
       {% endfor %}
     </div>
@@ -158,7 +169,7 @@
 
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span>All Expenses — {{ year_filter }}</span>
+        <span>{{ status_filter|title if status_filter != 'all' else 'All' }} Expenses — {{ year_filter }}</span>
         <span class="badge bg-secondary" id="exp-count">{{ all_expenses|length }}</span>
       </div>
       <div class="card-body p-0">

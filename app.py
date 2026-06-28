@@ -594,11 +594,20 @@ def expenses():
         return redirect(url_for("expenses", tab="expenses", year=date.today().year))
 
     # ── GET ────────────────────────────────────────────────────────────────────
-    tab        = request.args.get("tab", "expenses")
-    year_filter = request.args.get("year", str(date.today().year))
-    cat_filter  = request.args.get("cat", "")
+    tab          = request.args.get("tab", "expenses")
+    year_filter  = request.args.get("year", str(date.today().year))
+    cat_filter   = request.args.get("cat", "")
+    status_filter = request.args.get("status", "all")  # all / Paid / Forecast
 
     conn = get_db()
+
+    # Status clause
+    if status_filter in ("Paid", "Forecast"):
+        _s_clause = " AND status=?"
+        _s_param  = [status_filter]
+    else:
+        _s_clause = ""
+        _s_param  = []
 
     # Month normaliser — trims whitespace AND normalises capitalisation
     _month_norm = """CASE TRIM(UPPER(month))
@@ -614,30 +623,35 @@ def expenses():
         WHEN 'OCT' THEN 10 WHEN 'NOV' THEN 11 WHEN 'DEC' THEN 12 END"""
 
     if year_filter == "all":
-        all_expenses = conn.execute("SELECT * FROM expenses ORDER BY date DESC").fetchall()
+        all_expenses = conn.execute(
+            f"SELECT * FROM expenses WHERE 1=1{_s_clause} ORDER BY date DESC",
+            _s_param
+        ).fetchall()
         totals = conn.execute(
-            "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses GROUP BY category ORDER BY total DESC"
+            f"SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses WHERE 1=1{_s_clause} GROUP BY category ORDER BY total DESC",
+            _s_param
         ).fetchall()
         monthly = conn.execute(f"""
             SELECT year || '-' || ({_month_norm}) AS ym, SUM(amount) AS total
-            FROM expenses
-            GROUP BY year, UPPER(month)
+            FROM expenses WHERE 1=1{_s_clause}
+            GROUP BY year, TRIM(UPPER(month))
             ORDER BY year DESC, {_month_order}
-        """).fetchall()
+        """, _s_param).fetchall()
     else:
         all_expenses = conn.execute(
-            "SELECT * FROM expenses WHERE year=? ORDER BY date DESC", (year_filter,)
+            f"SELECT * FROM expenses WHERE year=?{_s_clause} ORDER BY date DESC",
+            [year_filter] + _s_param
         ).fetchall()
         totals = conn.execute(
-            "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses WHERE year=? GROUP BY category ORDER BY total DESC",
-            (year_filter,)
+            f"SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses WHERE year=?{_s_clause} GROUP BY category ORDER BY total DESC",
+            [year_filter] + _s_param
         ).fetchall()
         monthly = conn.execute(f"""
             SELECT ({_month_norm}) AS month, SUM(amount) AS total
-            FROM expenses WHERE year=?
+            FROM expenses WHERE year=?{_s_clause}
             GROUP BY TRIM(UPPER(month))
             ORDER BY {_month_order}
-        """, (year_filter,)).fetchall()
+        """, [year_filter] + _s_param).fetchall()
 
     years = conn.execute("SELECT DISTINCT year FROM expenses ORDER BY year DESC").fetchall()
 
@@ -671,6 +685,7 @@ def expenses():
         monthly=monthly,
         years=["all"] + [r["year"] for r in years],
         year_filter=year_filter,
+        status_filter=status_filter,
         today=date.today().isoformat(),
         suppliers_by_cat=suppliers_by_cat,
         cat_splits=cat_splits,
