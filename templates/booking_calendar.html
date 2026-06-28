@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+{% block title %}Booking Calendar{% endblock %}
+
+{% block content %}
+<style>
+  .cal-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  #calTable { border-collapse: collapse; width: 100%; }
+  #calTable th, #calTable td { border: 1px solid #e8e0d5; vertical-align: middle; }
+
+  .cal-room-cell {
+    min-width: 108px; max-width: 108px; width: 108px;
+    padding: .35rem .6rem;
+    font-size: .8rem; font-weight: 700;
+    color: var(--casetta-brown);
+    background: var(--casetta-light);
+    position: sticky; left: 0; z-index: 2;
+    border-right: 2px solid var(--casetta-cream) !important;
+    white-space: nowrap;
+  }
+  .cal-head-room {
+    min-width: 108px; max-width: 108px;
+    padding: .4rem .6rem;
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--casetta-brown);
+    background: var(--casetta-light);
+    position: sticky; left: 0; z-index: 3;
+    border-right: 2px solid var(--casetta-cream) !important;
+    border-bottom: 2px solid var(--casetta-cream) !important;
+  }
+  .cal-day-head {
+    min-width: 32px; max-width: 32px; width: 32px;
+    padding: 3px 0; text-align: center;
+    font-size: .68rem; line-height: 1.2;
+    font-weight: 700; color: var(--casetta-brown);
+    background: var(--casetta-light);
+    border-bottom: 2px solid var(--casetta-cream) !important;
+  }
+  .cal-day-head.weekend { background: #ede6dc; }
+  .cal-day-head.is-today {
+    background: var(--casetta-gold) !important;
+    color: #fff !important;
+    font-weight: 700;
+  }
+  .cal-day-head .dd { font-weight: 700; }
+  .cal-day-head .dn { font-weight: 300; opacity: .75; font-size: .6rem; }
+
+  .empty-day {
+    min-width: 32px; height: 36px; cursor: pointer;
+    transition: background .1s;
+  }
+  .empty-day:hover { background: rgba(201,168,122,.22) !important; }
+  .empty-day.weekend { background: #faf7f3; }
+  .empty-day.is-today { background: rgba(201,168,122,.15); }
+
+  .bk-cell {
+    height: 36px; cursor: pointer; padding: 3px 6px;
+    font-size: .72rem; text-align: left; vertical-align: middle;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    transition: filter .1s;
+  }
+  .bk-cell:hover { filter: brightness(1.12); }
+  .bk-cell.start { border-left: 3px solid rgba(255,255,255,.45) !important; }
+  .bk-cell.end { }
+  .bk-cell.cxl { opacity: .35; text-decoration: line-through; }
+
+  .legend-dot {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: .7rem; padding: 2px 8px;
+    border-radius: 20px; white-space: nowrap;
+  }
+
+  .prop-btn {
+    padding: .45rem 1.2rem; border-radius: 10px 10px 0 0;
+    font-size: .83rem; font-weight: 600; letter-spacing: .04em;
+    border: 1px solid var(--casetta-cream);
+    background: var(--casetta-light); color: var(--casetta-brown);
+    cursor: pointer; transition: background .15s;
+  }
+  .prop-btn.active {
+    background: #fff;
+    border-bottom: 1px solid #fff;
+    color: var(--casetta-brown);
+  }
+  .prop-btn:not(.active):hover { background: var(--casetta-cream); }
+
+  .month-nav-btn {
+    border: 1px solid var(--casetta-cream); background: none;
+    color: var(--casetta-brown); border-radius: 6px;
+    width: 34px; height: 34px; font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background .1s;
+  }
+  .month-nav-btn:hover { background: var(--casetta-cream); }
+
+  .dm-label {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+    color: #999; margin-bottom: 2px;
+  }
+  .dm-value { font-size: .9rem; color: var(--casetta-dark); }
+  .dm-value.large { font-size: 1.1rem; font-weight: 700; color: var(--casetta-brown); }
+</style>
+
+<!-- Page header -->
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div class="section-title mb-0">
+    <i class="bi bi-calendar3 me-2"></i>Booking Calendar
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="/bookings" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-list-ul me-1"></i>List
+    </a>
+    <!-- Year selector -->
+    <select id="yearSelect" class="form-select form-select-sm" style="width:90px;" onchange="changeYear(this.value)">
+      {% for y in years %}
+      <option value="{{ y }}">{{ y }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+<!-- Property tabs -->
+<div class="d-flex gap-1" id="propTabs" style="margin-bottom:-1px; position:relative; z-index:1;">
+  <button class="prop-btn active" id="btn-Casetta" onclick="setProperty('Casetta', this)">
+    <i class="bi bi-house me-1"></i>Casetta
+  </button>
+  <button class="prop-btn" id="btn-Folegandros" onclick="setProperty('Folegandros', this)">
+    <i class="bi bi-water me-1"></i>Folegandros
+  </button>
+</div>
+
+<!-- Main card -->
+<div class="card" style="border-radius:0 10px 10px 10px; overflow:hidden; position:relative;">
+
+  <!-- Month navigation bar -->
+  <div style="display:flex; align-items:center; justify-content:space-between;
+               padding:.65rem 1.2rem; background:var(--casetta-light);
+               border-bottom:1px solid var(--casetta-cream);">
+    <button class="month-nav-btn" onclick="prevMonth()" title="Previous month">
+      <i class="bi bi-chevron-left"></i>
+    </button>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div id="monthLabel" style="font-family:'Cormorant Garamond',serif;
+               font-size:1.5rem;font-weight:600;color:var(--casetta-brown);letter-spacing:.02em;"></div>
+      <button class="btn btn-sm" style="font-size:.72rem;padding:2px 10px;
+               border:1px solid var(--casetta-cream);color:var(--casetta-brown);background:white;"
+               onclick="jumpToToday()">Today</button>
+    </div>
+    <button class="month-nav-btn" onclick="nextMonth()" title="Next month">
+      <i class="bi bi-chevron-right"></i>
+    </button>
+  </div>
+
+  <!-- Source legend -->
+  <div id="legend" style="min-height:28px; padding:.35rem 1rem;
+                            background:#fff; border-bottom:1px solid #f0ebe3;
+                            display:flex; flex-wrap:wrap; gap:.4rem; align-items:center;
+                            font-size:.7rem; color:#888;">
+  </div>
+
+  <!-- Calendar grid -->
+  <div class="cal-wrap">
+    <table id="calTable"></table>
+  </div>
+
+  <!-- Empty state -->
+  <div id="noBookings" style="display:none; padding:2rem; text-align:center; color:#aaa; font-size:.9rem;">
+    <i class="bi bi-calendar-x" style="font-size:2rem;display:block;margin-bottom:.5rem;"></i>
+    No bookings this month
+  </div>
+</div>
+
+<!-- ── Booking Detail Modal ── -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+    <div class="modal-content" style="border:none;border-radius:12px;overflow:hidden;">
+      <div id="dm-header" class="modal-header" style="padding:1rem 1.3rem;">
+        <div>
+          <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;opacity:.7;">Booking</div>
+          <h5 class="modal-title mb-0" id="dm-title" style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600;"></h5>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.2rem 1.3rem;">
+        <div class="row g-3 mb-2">
+          <div class="col-6">
+            <div class="dm-label">Property / Room</div>
+            <div class="dm-value" id="dm-room"></div>
+          </div>
+          <div class="col-6">
+            <div class="dm-label">Status</div>
+            <div id="dm-confirmed"></div>
+          </div>
+        </div>
+        <div class="row g-3 mb-2">
+          <div class="col-4">
+            <div class="dm-label">Arrival</div>
+            <div class="dm-value" id="dm-arrival"></div>
+          </div>
+          <div class="col-4">
+            <div class="dm-label">Nights</div>
+            <div class="dm-value large" id="dm-nights"></div>
+          </div>
+          <div class="col-4">
+            <div class="dm-label">Departure</div>
+            <div class="dm-value" id="dm-departure"></div>
+          </div>
+        </div>
+        <div class="row g-3 mb-2">
+          <div class="col-6">
+            <div class="dm-label">Source</div>
+            <div class="dm-value" id="dm-source" style="font-size:.85rem;"></div>
+          </div>
+          <div class="col-3">
+            <div class="dm-label">Rate</div>
+            <div class="dm-value" id="dm-rate" style="font-size:.85rem;"></div>
+          </div>
+          <div class="col-3">
+            <div class="dm-label">Total</div>
+            <div class="dm-value" id="dm-total" style="font-weight:700;color:var(--casetta-brown);"></div>
+          </div>
+        </div>
+        <div id="dm-notes-row" class="row g-3">
+          <div class="col-12">
+            <div class="dm-label">Notes</div>
+            <div class="dm-value" id="dm-notes" style="font-size:.85rem;color:#666;white-space:pre-wrap;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:.8rem 1.3rem; background:#f9f7f4;">
+        <a id="dm-edit-link" href="#" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-pencil me-1"></i>Edit in List View
+        </a>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Quick Add Booking Modal ── -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border:none;border-radius:12px;overflow:hidden;">
+      <div class="modal-header" style="background:var(--casetta-brown);color:#fff;padding:1rem 1.3rem;">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>New Booking</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/bookings">
+        <input type="hidden" name="redirect_after" id="add-redirect">
+        <input type="hidden" name="property" id="add-property">
+        <input type="hidden" name="source_code" id="add-source-code">
+        <div class="modal-body" style="padding:1.3rem;">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Guest Name <span class="text-danger">*</span></label>
+              <input type="text" name="guest_name" class="form-control" required autofocus>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Room</label>
+              <input type="text" name="room" id="add-room" class="form-control"
+                     style="background:var(--casetta-light);" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Arrival <span class="text-danger">*</span></label>
+              <input type="date" name="arrival" id="add-arrival" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Nights <span class="text-danger">*</span></label>
+              <input type="number" name="num_nights" id="add-nights" class="form-control"
+                     min="1" value="7" required onchange="updateDeparture()">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Departure (auto)</label>
+              <input type="text" id="add-departure-display" class="form-control"
+                     style="background:var(--casetta-light);" readonly>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Source</label>
+              <select name="source" id="add-source" class="form-select" onchange="updateSourceCode(this)">
+                {% for name, code in sources %}
+                <option value="{{ name }}" data-code="{{ code }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Confirmed</label>
+              <select name="confirmed" class="form-select">
+                <option value="Yes">Confirmed</option>
+                <option value="Provisional">Provisional</option>
+                <option value="CXL">Cancelled</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Rate Type</label>
+              <select name="rate_type" class="form-select">
+                <option>RACK</option>
+                <option>NET</option>
+                <option>PROMO</option>
+                <option>COMP</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Total €</label>
+              <input type="number" name="total_cost" class="form-control"
+                     step="0.01" min="0" value="0">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" class="form-control" rows="2"
+                        placeholder="Dietary requirements, special requests…"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="background:#f9f7f4; padding:.8rem 1.3rem;">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i>Save Booking
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const allBookings = {{ bookings_json | safe }};
+const bookingsById = {};
+allBookings.forEach(b => { bookingsById[b.id] = b; });
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const CASETTA_ROOMS  = ['Whole House','Menta','Lavanda','Salvia','Prezzemolo','Cantina'];
+const FOL_ROOMS      = ['Whole House'];
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+const DAY3   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// Source → [bg, text, label]
+const SRC_COLORS = {
+  'Casetta (Direct - Tuscany)': ['#3c2415','#fff'],
+  'TTT':                        ['#1d5fa8','#fff'],
+  'TTT (From Casetta)':         ['#1a4f8a','#fff'],
+  'Gundari':                    ['#9c6e0a','#fff'],
+  'FOL Casetta':                ['#5a3275','#fff'],
+  'Xenia Offer Casetta':        ['#1a7055','#fff'],
+  'Xenia Offer Fol':            ['#9b2335','#fff'],
+};
+const DEF_COLOR = ['#6c757d','#fff'];
+
+function srcColor(src) { return SRC_COLORS[src] || DEF_COLOR; }
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const params  = new URLSearchParams(window.location.search);
+let curYear   = parseInt(params.get('year'))  || new Date().getFullYear();
+let curMonth  = parseInt(params.get('month')) || (new Date().getMonth() + 1);
+let curProp   = params.get('prop') || 'Casetta';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return '';
+  const [y,m,dd] = d.split('-');
+  return `${dd}/${m}/${y.slice(2)}`;
+}
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function dayOfWeek(y, m, d) { return new Date(y, m-1, d).getDay(); }
+function isWeekend(y, m, d) { const w=dayOfWeek(y,m,d); return w===0||w===6; }
+function padZ(n) { return String(n).padStart(2,'0'); }
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+
+// ── Init year selector ────────────────────────────────────────────────────────
+(function() {
+  const sel = document.getElementById('yearSelect');
+  for (let i=0; i<sel.options.length; i++) {
+    if (parseInt(sel.options[i].value) === curYear) {
+      sel.selectedIndex = i; break;
+    }
+  }
+})();
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderCalendar() {
+  const y = curYear, m = curMonth;
+  const dim = daysInMonth(y, m);
+  const today = new Date();
+  const ty=today.getFullYear(), tm=today.getMonth()+1, td=today.getDate();
+
+  // Update month label
+  document.getElementById('monthLabel').textContent = `${MONTHS[m-1]} ${y}`;
+
+  const rooms = curProp === 'Casetta' ? CASETTA_ROOMS : FOL_ROOMS;
+
+  // Filter bookings overlapping this month
+  const mStart = new Date(y, m-1, 1);
+  const mEnd   = new Date(y, m-1, dim, 23, 59);
+  const mBks = allBookings.filter(b => {
+    if ((b.property || 'Casetta') !== curProp) return false;
+    if (!b.arrival || !b.departure) return false;
+    return new Date(b.arrival) <= mEnd && new Date(b.departure) > mStart;
+  });
+
+  // Legend
+  const usedSrcs = [...new Set(mBks.map(b=>b.source).filter(Boolean))];
+  let leg = '';
+  if (usedSrcs.length) {
+    leg += `<span style="color:#aaa;margin-right:4px;">Sources:</span>`;
+    usedSrcs.forEach(src => {
+      const [bg,fg] = srcColor(src);
+      leg += `<span class="legend-dot" style="background:${bg};color:${fg};">${src}</span>`;
+    });
+    leg += `<span class="legend-dot" style="background:rgba(60,36,21,.08);color:var(--casetta-brown);border:1px dashed var(--casetta-gold);">Provisional</span>`;
+    leg += `<span class="legend-dot" style="background:#e9ecef;color:#6c757d;">Cancelled</span>`;
+  }
+  document.getElementById('legend').innerHTML = leg;
+
+  // Table
+  let html = '<thead><tr>';
+  html += `<th class="cal-head-room">Room</th>`;
+
+  for (let d=1; d<=dim; d++) {
+    const dw   = dayOfWeek(y,m,d);
+    const we   = dw===0||dw===6;
+    const isT  = y===ty && m===tm && d===td;
+    const cls  = `cal-day-head${we?' weekend':''}${isT?' is-today':''}`;
+    html += `<th class="${cls}">
+               <div class="dd">${d}</div>
+               <div class="dn">${DAY3[dw]}</div>
+             </th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  rooms.forEach((room, ri) => {
+    const rowBg = ri%2===0 ? '#fff' : '#fefcfa';
+    html += `<tr style="background:${rowBg}">`;
+
+    // Room label
+    const icon = room==='Whole House' ? '⌂ ' : '';
+    html += `<td class="cal-room-cell" style="background:var(--casetta-light);">${icon}${room}</td>`;
+
+    // Bookings for this room in this month
+    const rBks = mBks.filter(b => (b.room || 'Whole House') === room);
+
+    let d = 1;
+    while (d <= dim) {
+      // Find booking covering day d
+      const bk = rBks.find(b => {
+        const arr  = new Date(b.arrival);
+        const dep  = new Date(b.departure);
+        const aDay = (arr.getFullYear()===y && arr.getMonth()===m-1) ? arr.getDate() : 1;
+        const dDay = (dep.getFullYear()===y && dep.getMonth()===m-1) ? dep.getDate() : dim+1;
+        return aDay <= d && dDay > d;
+      });
+
+      if (bk) {
+        const arr  = new Date(bk.arrival);
+        const dep  = new Date(bk.departure);
+        const aDay = (arr.getFullYear()===y && arr.getMonth()===m-1) ? arr.getDate() : 1;
+        const dDay = (dep.getFullYear()===y && dep.getMonth()===m-1) ? dep.getDate() : dim+1;
+
+        const span     = Math.min(dDay, dim+1) - d;
+        const startsH  = aDay === d;
+        const endsH    = dDay <= dim;
+        const [bg, fg] = srcColor(bk.source);
+
+        const cxl  = bk.confirmed === 'CXL';
+        const prov = bk.confirmed === 'Provisional';
+
+        let cellStyle = `background:${bg};color:${fg};`;
+        if (cxl)  cellStyle = 'background:#e9ecef;color:#6c757d;';
+        if (prov) {
+          cellStyle = `background:repeating-linear-gradient(135deg,
+            ${bg} 0,${bg} 5px,rgba(255,255,255,.22) 5px,rgba(255,255,255,.22) 10px);
+            color:${fg};`;
+        }
+
+        // Border radius
+        const r1 = startsH ? '5px' : '0';
+        const r2 = endsH   ? '5px' : '0';
+        cellStyle += `border-radius:${r1} ${r2} ${r2} ${r1};`;
+        if (startsH) cellStyle += `border-left:3px solid rgba(255,255,255,.4);`;
+
+        // Guest name visibility
+        let name = '';
+        if (span >= 5)      name = bk.guest_name || '';
+        else if (span >= 3) name = (bk.guest_name||'').split(' ')[0];
+        else if (span >= 2) name = ((bk.guest_name||'').charAt(0)||'') + '.';
+
+        const nights = bk.num_nights;
+        const tip = `${bk.guest_name} · ${fmtDate(bk.arrival)}–${fmtDate(bk.departure)} (${nights}n) · ${bk.source||''}`
+          .replace(/"/g,'&quot;');
+
+        html += `<td colspan="${span}"
+                     class="bk-cell${startsH?' start':''}${cxl?' cxl':''}"
+                     style="${cellStyle}"
+                     onclick="showDetail(${bk.id})"
+                     title="${tip}">
+                   ${name ? `<span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block;">${name}</span>` : '&nbsp;'}
+                 </td>`;
+        d += span;
+
+      } else {
+        const we  = isWeekend(y,m,d);
+        const isT = y===ty && m===tm && d===td;
+        const dateStr = `${y}-${padZ(m)}-${padZ(d)}`;
+        let bg = '';
+        if (isT) bg = 'rgba(201,168,122,.15)';
+        else if (we) bg = '#faf7f3';
+
+        html += `<td class="empty-day${we?' weekend':''}${isT?' is-today':''}"
+                     style="background:${bg};"
+                     onclick="openAdd('${room}','${dateStr}')"
+                     title="Add booking: ${room}, ${fmtDate(dateStr)}">
+                 </td>`;
+        d++;
+      }
+    }
+    html += '</tr>';
+  });
+
+  html += '</tbody>';
+  document.getElementById('calTable').innerHTML = html;
+
+  // Update URL (no reload)
+  const url = `/bookings/calendar?year=${y}&month=${m}&prop=${encodeURIComponent(curProp)}`;
+  history.replaceState({}, '', url);
+}
+
+// ── Show booking detail ───────────────────────────────────────────────────────
+function showDetail(id) {
+  const b = bookingsById[id];
+  if (!b) return;
+
+  const [bg, fg] = srcColor(b.source);
+  const hdr = document.getElementById('dm-header');
+  hdr.style.background   = b.confirmed==='CXL' ? '#6c757d' : bg;
+  hdr.style.color        = fg;
+  hdr.querySelector('.btn-close').className = 'btn-close btn-close-white';
+
+  document.getElementById('dm-title').textContent    = b.guest_name || 'Booking';
+  document.getElementById('dm-room').textContent     = `${b.property||'Casetta'} — ${b.room||''}`;
+  document.getElementById('dm-arrival').textContent  = fmtDate(b.arrival);
+  document.getElementById('dm-nights').textContent   = b.num_nights + 'n';
+  document.getElementById('dm-departure').textContent = fmtDate(b.departure);
+  document.getElementById('dm-source').textContent   = b.source || '—';
+  document.getElementById('dm-rate').textContent     = b.rate_type || '—';
+  document.getElementById('dm-total').textContent    = b.total_cost ? `€${Number(b.total_cost).toLocaleString()}` : '—';
+  document.getElementById('dm-notes').textContent    = b.notes || '—';
+
+  const conf = b.confirmed || 'Yes';
+  const badgeCls = conf==='Yes' ? 'bg-success' : conf==='CXL' ? 'bg-danger' : 'bg-warning text-dark';
+  document.getElementById('dm-confirmed').innerHTML  = `<span class="badge ${badgeCls}">${conf}</span>`;
+
+  document.getElementById('dm-edit-link').href = '/bookings';
+
+  new bootstrap.Modal(document.getElementById('detailModal')).show();
+}
+
+// ── Open add modal ────────────────────────────────────────────────────────────
+function openAdd(room, dateStr) {
+  document.getElementById('add-room').value     = room;
+  document.getElementById('add-arrival').value  = dateStr;
+  document.getElementById('add-property').value = curProp;
+
+  // Set redirect back to same view
+  const redirUrl = `/bookings/calendar?year=${curYear}&month=${curMonth}&prop=${encodeURIComponent(curProp)}`;
+  document.getElementById('add-redirect').value = redirUrl;
+
+  updateDeparture();
+  updateSourceCode(document.getElementById('add-source'));
+  new bootstrap.Modal(document.getElementById('addModal')).show();
+}
+
+function updateDeparture() {
+  const arrival = document.getElementById('add-arrival').value;
+  const nights  = parseInt(document.getElementById('add-nights').value) || 0;
+  if (arrival && nights) {
+    const dep = addDays(arrival, nights);
+    document.getElementById('add-departure-display').value = fmtDate(dep);
+  }
+}
+
+function updateSourceCode(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('add-source-code').value = opt ? (opt.getAttribute('data-code')||'') : '';
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function prevMonth() {
+  curMonth--;
+  if (curMonth < 1) { curMonth = 12; curYear--; syncYearSel(); }
+  renderCalendar();
+}
+function nextMonth() {
+  curMonth++;
+  if (curMonth > 12) { curMonth = 1; curYear++; syncYearSel(); }
+  renderCalendar();
+}
+function changeYear(y) {
+  curYear = parseInt(y);
+  renderCalendar();
+}
+function jumpToToday() {
+  const n = new Date();
+  curYear = n.getFullYear(); curMonth = n.getMonth()+1;
+  syncYearSel(); renderCalendar();
+}
+function syncYearSel() {
+  const sel = document.getElementById('yearSelect');
+  for (let i=0;i<sel.options.length;i++) {
+    if (parseInt(sel.options[i].value)===curYear) { sel.selectedIndex=i; break; }
+  }
+}
+function setProperty(prop, btn) {
+  curProp = prop;
+  document.querySelectorAll('.prop-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderCalendar();
+}
+
+// ── Kick off ──────────────────────────────────────────────────────────────────
+// Set active tab from URL
+(function() {
+  if (curProp === 'Folegandros') {
+    document.getElementById('btn-Casetta').classList.remove('active');
+    document.getElementById('btn-Folegandros').classList.add('active');
+  }
+})();
+
+// Update add-departure when arrival changes
+document.getElementById('add-arrival').addEventListener('change', updateDeparture);
+
+renderCalendar();
+</script>
+{% endblock %}

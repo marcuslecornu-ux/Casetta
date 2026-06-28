@@ -179,7 +179,7 @@
     <a href="/expenses" class="nav-link {% if request.endpoint == 'expenses' %}active{% endif %}">
       <i class="bi bi-receipt"></i><span class="nav-label"> Expenses</span>
     </a>
-    <a href="/bookings" class="nav-link {% if request.endpoint == 'bookings' %}active{% endif %}">
+    <a href="/bookings" class="nav-link {% if request.endpoint in ['bookings', 'bookings_calendar'] %}active{% endif %}">
       <i class="bi bi-calendar-check"></i><span class="nav-label"> Bookings</span>
     </a>
     <a href="/menus" class="nav-link {% if request.endpoint == 'menus' %}active{% endif %}">

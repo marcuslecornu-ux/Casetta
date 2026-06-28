@@ -5,6 +5,7 @@ import sqlite3
 import os
 import csv
 import io
+import json
 from datetime import datetime, date
 from database import (get_db, init_db, ROOMS, DRINK_CATEGORIES, EXPENSE_CATEGORIES,
                        BOOKING_SOURCES, CASETTA_ROOMS, PROPERTIES, LOCATIONS, CATEGORY_CODE_PREFIX)
@@ -654,7 +655,8 @@ def bookings():
         conn.commit()
         conn.close()
         flash("Booking saved.", "success")
-        return redirect(url_for("bookings"))
+        redirect_after = request.form.get("redirect_after", url_for("bookings"))
+        return redirect(redirect_after)
 
     conn = get_db()
     year_filter = request.args.get("year", str(date.today().year))
@@ -676,6 +678,24 @@ def bookings():
         year_filter=int(year_filter),
         tab=tab,
         today=date.today().isoformat()
+    )
+
+
+@app.route("/bookings/calendar")
+@login_required
+def bookings_calendar():
+    # Load all bookings (small dataset — filtered client-side by month/year/property)
+    conn = get_db()
+    all_b = conn.execute("""
+        SELECT id, entry_date, guest_name, property, room, arrival, departure,
+               num_nights, source, source_code, confirmed, rate_type, total_cost, notes
+        FROM bookings ORDER BY arrival
+    """).fetchall()
+    conn.close()
+    return render_template("booking_calendar.html",
+        bookings_json=json.dumps([dict(b) for b in all_b]),
+        sources=BOOKING_SOURCES,
+        years=list(range(2024, date.today().year + 3)),
     )
 
 
