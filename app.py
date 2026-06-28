@@ -714,7 +714,9 @@ def edit_expense(uid):
     conn.commit()
     conn.close()
     flash("Expense updated.", "success")
-    return redirect(url_for("expenses", tab="expenses", year=dt.year))
+    return_year   = request.form.get("return_year", str(dt.year))
+    return_status = request.form.get("return_status", "all")
+    return redirect(url_for("expenses", tab="expenses", year=return_year, status=return_status))
 
 
 @app.route("/expenses/delete/<uid>", methods=["POST"])
@@ -729,7 +731,9 @@ def delete_expense(uid):
     conn.commit()
     conn.close()
     flash("Expense deleted.", "success")
-    return redirect(url_for("expenses", tab="expenses", year=year))
+    return_year   = request.form.get("return_year", str(year))
+    return_status = request.form.get("return_status", "all")
+    return redirect(url_for("expenses", tab="expenses", year=return_year, status=return_status))
 
 
 @app.route("/api/expense_suppliers/<path:category>")

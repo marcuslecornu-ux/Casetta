@@ -159,6 +159,12 @@
          {% if s == 'Paid' %}<i class="bi bi-check-circle ms-1"></i>{% endif %}
       </a>
       {% endfor %}
+      {% if year_filter|string != today[:4] or status_filter != 'all' %}
+      <a href="{{ url_for('expenses', tab='expenses', year=today[:4], status='all') }}"
+         class="btn btn-sm btn-outline-danger ms-2">
+        <i class="bi bi-x-circle me-1"></i>Reset
+      </a>
+      {% endif %}
     </div>
 
     <!-- Search -->
@@ -592,6 +598,8 @@ document.querySelectorAll('.month-drill-row').forEach(function(row) {
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="POST" id="editExpForm" action="">
+        <input type="hidden" name="return_year"   id="edit-return-year"   value="{{ year_filter }}">
+        <input type="hidden" name="return_status" id="edit-return-status" value="{{ status_filter }}">
         <div class="modal-body">
           <div class="row g-2 mb-3">
             <div class="col-6">
@@ -653,7 +661,10 @@ document.querySelectorAll('.month-drill-row').forEach(function(row) {
 </div>
 
 <!-- Delete form lives outside the edit form to avoid nested-form invalid HTML -->
-<form method="POST" id="deleteExpForm" action="" style="display:none"></form>
+<form method="POST" id="deleteExpForm" action="" style="display:none">
+  <input type="hidden" name="return_year"   id="del-return-year"   value="{{ year_filter }}">
+  <input type="hidden" name="return_status" id="del-return-status" value="{{ status_filter }}">
+</form>
 
 
 <script>
