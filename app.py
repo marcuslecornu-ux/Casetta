@@ -534,6 +534,104 @@ def delete_stock_item(item_id):
     return redirect(url_for("stock") + "#tabInventory")
 
 
+# ─── GLOBAL CONTEXT ──────────────────────────────────────────────────────────
+
+@app.context_processor
+def inject_manager_count():
+    """Make manager action count available in all templates for sidebar badge."""
+    if not current_user.is_authenticated:
+        return {"manager_action_count": 0}
+    try:
+        conn = get_db()
+        today = date.today()
+        _month_num = """CASE TRIM(UPPER(month))
+            WHEN 'JAN' THEN 1 WHEN 'FEB' THEN 2 WHEN 'MAR' THEN 3
+            WHEN 'APR' THEN 4 WHEN 'MAY' THEN 5 WHEN 'JUN' THEN 6
+            WHEN 'JUL' THEN 7 WHEN 'AUG' THEN 8 WHEN 'SEP' THEN 9
+            WHEN 'OCT' THEN 10 WHEN 'NOV' THEN 11 WHEN 'DEC' THEN 12 ELSE 0 END"""
+        count = conn.execute(f"""
+            SELECT COUNT(*) FROM expenses
+            WHERE status='Forecast'
+            AND (year < ? OR (year = ? AND ({_month_num}) < ?))
+        """, (today.year, today.year, today.month)).fetchone()[0]
+        conn.close()
+        return {"manager_action_count": count}
+    except Exception:
+        return {"manager_action_count": 0}
+
+
+# ─── MANAGER ACTIONS ──────────────────────────────────────────────────────────
+
+@app.route("/manager")
+@login_required
+def manager():
+    today = date.today()
+    conn  = get_db()
+    _month_num = """CASE TRIM(UPPER(month))
+        WHEN 'JAN' THEN 1 WHEN 'FEB' THEN 2 WHEN 'MAR' THEN 3
+        WHEN 'APR' THEN 4 WHEN 'MAY' THEN 5 WHEN 'JUN' THEN 6
+        WHEN 'JUL' THEN 7 WHEN 'AUG' THEN 8 WHEN 'SEP' THEN 9
+        WHEN 'OCT' THEN 10 WHEN 'NOV' THEN 11 WHEN 'DEC' THEN 12 ELSE 0 END"""
+    overdue = conn.execute(f"""
+        SELECT *, ({_month_num}) AS month_num
+        FROM expenses
+        WHERE status='Forecast'
+          AND (year < ? OR (year = ? AND ({_month_num}) < ?))
+        ORDER BY year, ({_month_num}), category
+    """, (today.year, today.year, today.month)).fetchall()
+    total = sum(r["amount"] for r in overdue)
+    suppliers = conn.execute(
+        "SELECT DISTINCT name FROM expense_suppliers WHERE active=1 ORDER BY name"
+    ).fetchall()
+    conn.close()
+    from database import EXPENSE_CATEGORIES
+    return render_template("manager.html",
+        overdue=overdue,
+        total=total,
+        today=today.isoformat(),
+        categories=EXPENSE_CATEGORIES,
+        suppliers=[r["name"] for r in suppliers],
+    )
+
+
+@app.route("/manager/edit/<uid>", methods=["POST"])
+@login_required
+def manager_edit_expense(uid):
+    expense_month = request.form.get("expense_month", date.today().strftime("%Y-%m"))
+    exp_date   = expense_month + "-01"
+    entry_date = request.form.get("entry_date", date.today().isoformat())
+    dt = datetime.strptime(exp_date, "%Y-%m-%d")
+    conn = get_db()
+    conn.execute("""
+        UPDATE expenses
+        SET date=?,entry_date=?,category=?,sub_category=?,comments=?,amount=?,status=?,month=?,year=?
+        WHERE uid=?
+    """, (exp_date, entry_date, request.form.get("category"),
+          request.form.get("sub_category",""), request.form.get("comments",""),
+          float(request.form.get("amount",0)), request.form.get("status","Paid"),
+          dt.strftime("%b"), dt.year, uid))
+    log_action(conn, "UPDATE", "expense", uid,
+               f"Manager action — edited: {request.form.get('category')} €{float(request.form.get('amount',0)):.2f} ({dt.strftime('%b %Y')})")
+    conn.commit()
+    conn.close()
+    flash("Expense updated.", "success")
+    return redirect(url_for("manager"))
+
+
+@app.route("/manager/delete/<uid>", methods=["POST"])
+@login_required
+def manager_delete_expense(uid):
+    conn = get_db()
+    row  = conn.execute("SELECT category, amount FROM expenses WHERE uid=?", (uid,)).fetchone()
+    log_action(conn, "DELETE", "expense", uid,
+               f"Manager action — deleted: {row['category']} €{row['amount']:.2f}" if row else f"Deleted expense {uid}")
+    conn.execute("DELETE FROM expenses WHERE uid=?", (uid,))
+    conn.commit()
+    conn.close()
+    flash("Expense deleted.", "success")
+    return redirect(url_for("manager"))
+
+
 # ─── EXPENSES ─────────────────────────────────────────────────────────────────
 
 @app.route("/expenses", methods=["GET", "POST"])

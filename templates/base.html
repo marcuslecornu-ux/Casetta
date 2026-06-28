@@ -179,6 +179,14 @@
     <a href="/expenses" class="nav-link {% if request.endpoint == 'expenses' %}active{% endif %}">
       <i class="bi bi-receipt"></i><span class="nav-label"> Expenses</span>
     </a>
+    <a href="/manager" class="nav-link {% if request.endpoint == 'manager' %}active{% endif %}" style="position:relative">
+      <i class="bi bi-clipboard-check"></i><span class="nav-label"> Manager Actions</span>
+      {% if manager_action_count > 0 %}
+      <span class="badge bg-danger rounded-pill" style="font-size:.65rem;position:absolute;right:10px;top:50%;transform:translateY(-50%)">
+        {{ manager_action_count }}
+      </span>
+      {% endif %}
+    </a>
     <a href="/bookings" class="nav-link {% if request.endpoint in ['bookings', 'bookings_calendar'] %}active{% endif %}">
       <i class="bi bi-calendar-check"></i><span class="nav-label"> Bookings</span>
     </a>

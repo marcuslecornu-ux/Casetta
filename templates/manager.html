@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Manager Actions — Casetta{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-3 gap-3">
+  <h2 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Manager Actions</h2>
+  {% if overdue %}
+  <span class="badge bg-danger fs-6">{{ overdue|length }} outstanding</span>
+  <span class="ms-auto fw-bold text-danger">Total: €{{ "%.2f"|format(total) }}</span>
+  {% endif %}
+</div>
+
+<p class="text-muted small mb-3">
+  Forecast expenses from previous months that require action — mark as paid, update, or delete.
+</p>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat == 'success' else 'danger' }} alert-dismissible fade show py-2">
+    {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{% if not overdue %}
+<div class="card text-center py-5">
+  <div class="card-body">
+    <i class="bi bi-check-circle text-success" style="font-size:3rem"></i>
+    <h4 class="mt-3 text-success">All clear!</h4>
+    <p class="text-muted">No outstanding forecast expenses from previous months.</p>
+  </div>
+</div>
+{% else %}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div style="max-height:75vh;overflow-y:auto">
+    <table class="table table-sm table-hover mb-0" id="mgr-table">
+      <thead class="sticky-top" style="background:var(--casetta-brown);color:#fff">
+        <tr>
+          <th onclick="sortMgr('month')" style="cursor:pointer;white-space:nowrap">
+            Month <span id="sort-month">⇅</span>
+          </th>
+          <th onclick="sortMgr('category')" style="cursor:pointer">
+            Category <span id="sort-category">⇅</span>
+          </th>
+          <th onclick="sortMgr('sub')" style="cursor:pointer">
+            Supplier <span id="sort-sub">⇅</span>
+          </th>
+          <th onclick="sortMgr('comments')" style="cursor:pointer">
+            Comments <span id="sort-comments">⇅</span>
+          </th>
+          <th onclick="sortMgr('amount')" style="cursor:pointer;text-align:right;white-space:nowrap">
+            Amount € <span id="sort-amount">⇅</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="mgr-tbody">
+        {% set mo = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'} %}
+        {% for e in overdue %}
+        <tr ondblclick="openEditMgr(this)" style="cursor:pointer"
+            data-uid="{{ e.uid }}"
+            data-date="{{ e.date }}"
+            data-month="{{ e.year }}{{ mo.get((e.month or '')|trim, '00') }}"
+            data-category="{{ e.category }}"
+            data-sub="{{ e.sub_category or '' }}"
+            data-comments="{{ e.comments or '' }}"
+            data-amount="{{ e.amount }}"
+            data-status="{{ e.status }}"
+            data-entry="{{ e.entry_date or e.date }}">
+          <td>
+            <span class="fw-semibold text-danger">{{ e.month }} {{ e.year }}</span>
+          </td>
+          <td><small>{{ e.category }}</small></td>
+          <td><small>{{ e.sub_category or '—' }}</small></td>
+          <td><small>{{ e.comments or '' }}</small></td>
+          <td class="text-end fw-bold">€{{ "%.2f"|format(e.amount) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--casetta-light)">
+          <td colspan="4" class="text-end fw-bold">Total Outstanding</td>
+          <td class="text-end fw-bold text-danger">€{{ "%.2f"|format(total) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══ EDIT MODAL ══ -->
+<div class="modal fade" id="editMgrModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--casetta-brown);color:#fff">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Expense</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editMgrForm" action="">
+        <div class="modal-body">
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Entry Date <small class="text-muted">(recorded)</small></label>
+              <input type="date" name="entry_date" id="mgr-entry-date" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Expense Month <small class="text-muted">(period)</small></label>
+              <input type="month" name="expense_month" id="mgr-expense-month" class="form-control" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select name="category" id="mgr-category" class="form-select">
+              <option value="">— Select —</option>
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sub-category / Supplier</label>
+            <input type="text" name="sub_category" id="mgr-sub" class="form-control"
+                   list="mgr-sub-list" autocomplete="off">
+            <datalist id="mgr-sub-list">
+              {% for s in suppliers %}
+              <option value="{{ s }}">
+              {% endfor %}
+            </datalist>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Comments</label>
+            <input type="text" name="comments" id="mgr-comments" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount (€)</label>
+            <div class="input-group">
+              <span class="input-group-text">€</span>
+              <input type="number" name="amount" id="mgr-amount" class="form-control" step="0.01" min="0" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <select name="status" id="mgr-status" class="form-select">
+              <option value="Paid">Paid</option>
+              <option value="Forecast">Forecast</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-danger" onclick="deleteMgrExp()">
+            <i class="bi bi-trash me-1"></i>Delete
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete form (separate to avoid nested forms) -->
+<form method="POST" id="deleteMgrForm" action="" style="display:none"></form>
+
+
+<script>
+// ── Sort ─────────────────────────────────────────────────────
+var _sortCol = 'month', _sortAsc = true;
+
+function sortMgr(col) {
+  if (_sortCol === col) _sortAsc = !_sortAsc;
+  else { _sortCol = col; _sortAsc = true; }
+
+  // Update icons
+  ['month','category','sub','comments','amount'].forEach(function(c) {
+    var el = document.getElementById('sort-' + c);
+    if (el) el.textContent = c === col ? (_sortAsc ? '▲' : '▼') : '⇅';
+  });
+
+  var tbody = document.getElementById('mgr-tbody');
+  var rows  = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort(function(a, b) {
+    var av = a.dataset[col] || '';
+    var bv = b.dataset[col] || '';
+    if (col === 'amount') return _sortAsc ? parseFloat(av) - parseFloat(bv) : parseFloat(bv) - parseFloat(av);
+    return _sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(function(r) { tbody.appendChild(r); });
+}
+
+// ── Edit modal ────────────────────────────────────────────────
+function openEditMgr(row) {
+  document.getElementById('editMgrForm').action   = '/manager/edit/'   + row.dataset.uid;
+  document.getElementById('deleteMgrForm').action = '/manager/delete/' + row.dataset.uid;
+
+  var ed = row.dataset.entry || row.dataset.date;
+  document.getElementById('mgr-entry-date').value    = ed;
+  document.getElementById('mgr-expense-month').value = row.dataset.date ? row.dataset.date.substring(0,7) : '';
+  document.getElementById('mgr-category').value      = row.dataset.category || '';
+  document.getElementById('mgr-sub').value           = row.dataset.sub      || '';
+  document.getElementById('mgr-comments').value      = row.dataset.comments || '';
+  document.getElementById('mgr-amount').value        = row.dataset.amount   || '';
+  document.getElementById('mgr-status').value        = row.dataset.status   || 'Forecast';
+
+  new bootstrap.Modal(document.getElementById('editMgrModal')).show();
+}
+
+function deleteMgrExp() {
+  if (confirm('Delete this expense? This cannot be undone.')) {
+    document.getElementById('deleteMgrForm').submit();
+  }
+}
+</script>
+
+{% endblock %}
