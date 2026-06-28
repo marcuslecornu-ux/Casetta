@@ -1168,6 +1168,117 @@ def delete_other_income(uid):
     return redirect(url_for("other_income"))
 
 
+# ─── ACCOUNTING ───────────────────────────────────────────────────────────────
+
+@app.route("/accounting")
+@login_required
+def accounting():
+    year = int(request.args.get("year", date.today().year))
+    months = [f"{year}-{m:02d}" for m in range(1, 13)]
+    month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+    conn = get_db()
+
+    # ── Accommodation (bookings.total_cost, keyed by arrival month) ──
+    accom_rows = conn.execute("""
+        SELECT strftime('%Y-%m', arrival) AS ym, SUM(total_cost) AS total
+        FROM bookings WHERE strftime('%Y', arrival)=? AND confirmed != 'CXL'
+        GROUP BY ym
+    """, (str(year),)).fetchall()
+    accom = {r["ym"]: r["total"] for r in accom_rows}
+
+    # ── Drink sales (is_hosted=0) ──
+    drinks_rows = conn.execute("""
+        SELECT strftime('%Y-%m', date) AS ym, SUM(total_sale) AS total
+        FROM drink_sales WHERE strftime('%Y', date)=? AND is_hosted=0
+        GROUP BY ym
+    """, (str(year),)).fetchall()
+    drinks = {r["ym"]: r["total"] for r in drinks_rows}
+
+    # ── Other income — by month AND by type ──
+    other_rows = conn.execute("""
+        SELECT strftime('%Y-%m', date) AS ym, type, SUM(total) AS total
+        FROM other_income WHERE strftime('%Y', date)=?
+        GROUP BY ym, type
+    """, (str(year),)).fetchall()
+    other_types = sorted(set(r["type"] for r in other_rows))
+    # other[type][ym] = total
+    other = {}
+    for r in other_rows:
+        other.setdefault(r["type"], {})[r["ym"]] = r["total"]
+
+    # ── Expenses — by month AND by category ──
+    exp_rows = conn.execute("""
+        SELECT strftime('%Y-%m', date) AS ym, category, SUM(amount) AS total
+        FROM expenses WHERE strftime('%Y', date)=?
+        GROUP BY ym, category
+    """, (str(year),)).fetchall()
+    exp_cats = sorted(set(r["category"] for r in exp_rows))
+    # expenses[category][ym] = total
+    expenses = {}
+    for r in exp_rows:
+        expenses.setdefault(r["category"], {})[r["ym"]] = r["total"]
+
+    # ── Available years (union across all tables) ──
+    yrs_sql = """
+        SELECT DISTINCT strftime('%Y', arrival) AS yr FROM bookings WHERE arrival IS NOT NULL
+        UNION SELECT DISTINCT strftime('%Y', date) FROM drink_sales
+        UNION SELECT DISTINCT strftime('%Y', date) FROM other_income
+        UNION SELECT DISTINCT strftime('%Y', date) FROM expenses
+        ORDER BY yr DESC
+    """
+    available_years = [r[0] for r in conn.execute(yrs_sql).fetchall() if r[0]]
+    conn.close()
+
+    # ── Helper: row totals ──
+    def month_vals(data_dict, ym_list):
+        return [data_dict.get(ym, 0) or 0 for ym in ym_list]
+
+    # Build structured data for template
+    inc_accom  = month_vals(accom, months)
+    inc_drinks = month_vals(drinks, months)
+    inc_other  = {t: month_vals(other.get(t, {}), months) for t in other_types}
+
+    # Total income per month
+    inc_total = []
+    for i in range(12):
+        t = inc_accom[i] + inc_drinks[i] + sum(inc_other[ot][i] for ot in other_types)
+        inc_total.append(t)
+
+    # Expense rows per month
+    exp_rows_data = {c: month_vals(expenses.get(c, {}), months) for c in exp_cats}
+    exp_total = []
+    for i in range(12):
+        exp_total.append(sum(exp_rows_data[c][i] for c in exp_cats))
+
+    # Profit
+    profit = [inc_total[i] - exp_total[i] for i in range(12)]
+    margin = [round(profit[i]/inc_total[i]*100, 1) if inc_total[i] else 0 for i in range(12)]
+
+    def row_total(lst): return sum(lst)
+
+    return render_template("accounting.html",
+        year=year,
+        available_years=available_years if available_years else [year],
+        months=months,
+        month_labels=month_labels,
+        # Income
+        inc_accom=inc_accom,
+        inc_drinks=inc_drinks,
+        inc_other=inc_other,
+        other_types=other_types,
+        inc_total=inc_total,
+        # Expenses
+        exp_rows=exp_rows_data,
+        exp_cats=exp_cats,
+        exp_total=exp_total,
+        # P&L
+        profit=profit,
+        margin=margin,
+        row_total=row_total,
+    )
+
+
 @app.route("/menus")
 @login_required
 def menus():

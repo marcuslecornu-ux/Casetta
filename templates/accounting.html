@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% block title %}Accounting{% endblock %}
+
+{% block content %}
+
+{# ── Macros ─────────────────────────────────────────────────────────────────── #}
+{% macro fmt(v) %}{% if v %}€{{ "{:,.0f}".format(v) }}{% else %}—{% endif %}{% endmacro %}
+{% macro fmtd(v) %}{% if v and v != 0 %}€{{ "{:,.0f}".format(v) }}{% else %}—{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v %}{{ v }}%{% else %}—{% endif %}{% endmacro %}
+
+{# ── Header ──────────────────────────────────────────────────────────────────── #}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div class="section-title mb-0"><i class="bi bi-bar-chart-line me-2"></i>Accounting</div>
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    {% for y in available_years %}
+    <a href="/accounting?year={{ y }}"
+       class="btn btn-sm {% if y|int == year %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      {{ y }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Tabs ─────────────────────────────────────────────────────────────────────── #}
+<ul class="nav nav-tabs mb-4" id="acctTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabDashboard"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabPL"><i class="bi bi-table me-1"></i>P&amp;L</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabIncome"><i class="bi bi-graph-up-arrow me-1"></i>Income</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabExpenses"><i class="bi bi-graph-down-arrow me-1"></i>Expenses</a></li>
+</ul>
+
+<div class="tab-content">
+
+{# ════════════════════════════════════════════════════════════════════════
+   DASHBOARD
+════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade show active" id="tabDashboard">
+
+  {# KPI Cards #}
+  {% set ytd_income  = row_total(inc_total) %}
+  {% set ytd_costs   = row_total(exp_total) %}
+  {% set ytd_profit  = ytd_income - ytd_costs %}
+  {% set ytd_margin  = (ytd_profit / ytd_income * 100)|round(1) if ytd_income else 0 %}
+  {% set ytd_accom   = row_total(inc_accom) %}
+  {% set ytd_drinks  = row_total(inc_drinks) %}
+  {% set ytd_other   = inc_other.values()|map('sum')|sum %}
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card p-3 text-center h-100" style="border-left:4px solid var(--casetta-gold)">
+        <div class="text-muted small mb-1">YTD Revenue</div>
+        <div class="fw-bold fs-4" style="color:var(--casetta-brown)">€{{ "{:,.0f}".format(ytd_income) }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card p-3 text-center h-100" style="border-left:4px solid #dc3545">
+        <div class="text-muted small mb-1">YTD Costs</div>
+        <div class="fw-bold fs-4 text-danger">€{{ "{:,.0f}".format(ytd_costs) }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card p-3 text-center h-100" style="border-left:4px solid {% if ytd_profit >= 0 %}#198754{% else %}#dc3545{% endif %}">
+        <div class="text-muted small mb-1">YTD Profit</div>
+        <div class="fw-bold fs-4 {% if ytd_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+          €{{ "{:,.0f}".format(ytd_profit) }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card p-3 text-center h-100" style="border-left:4px solid #0d6efd">
+        <div class="text-muted small mb-1">Margin</div>
+        <div class="fw-bold fs-4">{{ ytd_margin }}%</div>
+      </div>
+    </div>
+  </div>
+
+  {# Income breakdown cards #}
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card p-3 text-center">
+        <div class="text-muted small mb-1"><i class="bi bi-house me-1"></i>Accommodation</div>
+        <div class="fw-bold fs-5">€{{ "{:,.0f}".format(ytd_accom) }}</div>
+        <div class="text-muted small">{{ ((ytd_accom/ytd_income*100)|round(1)) if ytd_income else 0 }}% of income</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 text-center">
+        <div class="text-muted small mb-1"><i class="bi bi-cup-straw me-1"></i>Drink Sales</div>
+        <div class="fw-bold fs-5">€{{ "{:,.0f}".format(ytd_drinks) }}</div>
+        <div class="text-muted small">{{ ((ytd_drinks/ytd_income*100)|round(1)) if ytd_income else 0 }}% of income</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 text-center">
+        <div class="text-muted small mb-1"><i class="bi bi-cash-coin me-1"></i>Other Income</div>
+        <div class="fw-bold fs-5">€{{ "{:,.0f}".format(ytd_other) }}</div>
+        <div class="text-muted small">{{ ((ytd_other/ytd_income*100)|round(1)) if ytd_income else 0 }}% of income</div>
+      </div>
+    </div>
+  </div>
+
+  {# Charts #}
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">Monthly P&L — {{ year }}</div>
+        <div class="card-body">
+          <canvas id="plChart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">Income Mix — {{ year }}</div>
+        <div class="card-body d-flex align-items-center justify-content-center">
+          <canvas id="mixChart" style="max-height:240px"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   P&L TABLE
+════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tabPL">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Profit &amp; Loss — {{ year }}</span>
+      <small class="text-muted">Click a month heading to drill down</small>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0 small" id="plTable">
+          <thead class="table-dark">
+            <tr>
+              <th style="min-width:160px"></th>
+              {% for i in range(12) %}
+              <th class="text-end month-head" style="cursor:pointer;min-width:75px"
+                  onclick="drillMonth('{{ months[i] }}', '{{ month_labels[i] }}')"
+                  title="Click to drilldown">
+                {{ month_labels[i] }}
+              </th>
+              {% endfor %}
+              <th class="text-end" style="min-width:85px">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {# ── INCOME ── #}
+            <tr style="background:var(--casetta-light)">
+              <td colspan="14" class="fw-bold text-uppercase small" style="letter-spacing:.05em;color:var(--casetta-brown)">
+                <i class="bi bi-graph-up-arrow me-1"></i>Income
+              </td>
+            </tr>
+            <tr>
+              <td class="ps-3">Accommodation</td>
+              {% for v in inc_accom %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(inc_accom)) }}</td>
+            </tr>
+            <tr>
+              <td class="ps-3">Drink Sales</td>
+              {% for v in inc_drinks %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(inc_drinks)) }}</td>
+            </tr>
+            {% for ot in other_types %}
+            <tr>
+              <td class="ps-3 text-muted">{{ ot }}</td>
+              {% for v in inc_other[ot] %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(inc_other[ot])) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="table-success fw-bold">
+              <td>Total Income</td>
+              {% for v in inc_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
+              <td class="text-end">{{ fmt(row_total(inc_total)) }}</td>
+            </tr>
+
+            {# ── EXPENSES ── #}
+            <tr style="background:var(--casetta-light)">
+              <td colspan="14" class="fw-bold text-uppercase small" style="letter-spacing:.05em;color:#dc3545">
+                <i class="bi bi-graph-down-arrow me-1"></i>Expenses
+              </td>
+            </tr>
+            {% for cat in exp_cats %}
+            <tr>
+              <td class="ps-3 text-muted">{{ cat }}</td>
+              {% for v in exp_rows[cat] %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(exp_rows[cat])) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="table-danger fw-bold">
+              <td>Total Expenses</td>
+              {% for v in exp_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
+              <td class="text-end">{{ fmt(row_total(exp_total)) }}</td>
+            </tr>
+
+            {# ── PROFIT ── #}
+            <tr style="background:var(--casetta-brown);color:#fff">
+              <td class="fw-bold">NET PROFIT</td>
+              {% for v in profit %}
+              <td class="text-end fw-bold {% if v < 0 %}text-warning{% endif %}">{{ fmt(v) }}</td>
+              {% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(profit)) }}</td>
+            </tr>
+            <tr class="table-secondary">
+              <td class="text-muted">Margin %</td>
+              {% for v in margin %}<td class="text-end text-muted">{{ pct(v) }}</td>{% endfor %}
+              {% set tot_margin = (row_total(profit)/row_total(inc_total)*100)|round(1) if row_total(inc_total) else 0 %}
+              <td class="text-end fw-bold">{{ tot_margin }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# Drilldown panel (hidden until month clicked) #}
+  <div id="drillPanel" class="card mt-4" style="display:none">
+    <div class="card-header fw-bold" id="drillTitle"></div>
+    <div class="card-body p-0" id="drillBody"></div>
+  </div>
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   INCOME BREAKDOWN
+════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tabIncome">
+  <div class="card mb-4">
+    <div class="card-header">Income by Stream — {{ year }}</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0 small">
+          <thead class="table-dark">
+            <tr>
+              <th style="min-width:160px">Stream</th>
+              {% for l in month_labels %}<th class="text-end" style="min-width:72px">{{ l }}</th>{% endfor %}
+              <th class="text-end">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="fw-bold" style="background:rgba(201,168,122,.15)">
+              <td>Accommodation</td>
+              {% for v in inc_accom %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end">{{ fmt(row_total(inc_accom)) }}</td>
+            </tr>
+            <tr class="fw-bold" style="background:rgba(201,168,122,.15)">
+              <td>Drink Sales</td>
+              {% for v in inc_drinks %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end">{{ fmt(row_total(inc_drinks)) }}</td>
+            </tr>
+            {% for ot in other_types %}
+            <tr>
+              <td class="ps-3">{{ ot }}</td>
+              {% for v in inc_other[ot] %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(inc_other[ot])) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="table-success fw-bold">
+              <td>TOTAL INCOME</td>
+              {% for v in inc_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
+              <td class="text-end">{{ fmt(row_total(inc_total)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">Income Trend</div>
+    <div class="card-body"><canvas id="incomeChart" height="100"></canvas></div>
+  </div>
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   EXPENSE BREAKDOWN
+════════════════════════════════════════════════════════════════════════ #}
+<div class="tab-pane fade" id="tabExpenses">
+  <div class="card mb-4">
+    <div class="card-header">Expenses by Category — {{ year }}</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0 small">
+          <thead class="table-dark">
+            <tr>
+              <th style="min-width:160px">Category</th>
+              {% for l in month_labels %}<th class="text-end" style="min-width:72px">{{ l }}</th>{% endfor %}
+              <th class="text-end">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat in exp_cats %}
+            <tr>
+              <td class="ps-2">{{ cat }}</td>
+              {% for v in exp_rows[cat] %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
+              <td class="text-end fw-bold">{{ fmt(row_total(exp_rows[cat])) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="table-danger fw-bold">
+              <td>TOTAL EXPENSES</td>
+              {% for v in exp_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
+              <td class="text-end">{{ fmt(row_total(exp_total)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">Expense Trend by Category</div>
+    <div class="card-body"><canvas id="expChart" height="100"></canvas></div>
+  </div>
+</div>
+
+</div>{# end tab-content #}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const MONTHS   = {{ month_labels | tojson }};
+const INC_ACCOM  = {{ inc_accom | tojson }};
+const INC_DRINKS = {{ inc_drinks | tojson }};
+const INC_TOTAL  = {{ inc_total | tojson }};
+const EXP_TOTAL  = {{ exp_total | tojson }};
+const PROFIT     = {{ profit | tojson }};
+const OTHER_TYPES = {{ other_types | tojson }};
+const INC_OTHER  = {{ inc_other | tojson }};
+const EXP_CATS   = {{ exp_cats | tojson }};
+const EXP_ROWS   = {{ exp_rows | tojson }};
+
+// Colour palette
+const PALETTE = ['#3c2415','#c9a87a','#5b8c5a','#2e6da4','#a85c32','#7a5c8c','#2e8c7a','#8c2e2e','#5c7a2e','#4a4a6a'];
+
+function fmt(v) {
+  if (!v || v === 0) return '—';
+  return '€' + Math.round(v).toLocaleString('en-IE');
+}
+
+// ── P&L Chart (Dashboard) ─────────────────────────────────────────────────────
+new Chart(document.getElementById('plChart'), {
+  type: 'bar',
+  data: {
+    labels: MONTHS,
+    datasets: [
+      { label: 'Income',   data: INC_TOTAL,  backgroundColor: 'rgba(90,140,90,.7)',  order: 2 },
+      { label: 'Expenses', data: EXP_TOTAL,  backgroundColor: 'rgba(220,53,69,.6)',  order: 2 },
+      { label: 'Profit',   data: PROFIT,     type: 'line', borderColor: '#c9a87a',
+        backgroundColor: 'rgba(201,168,122,.15)', fill: true, tension: 0.3, order: 1,
+        pointBackgroundColor: '#c9a87a', pointRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { position: 'bottom' },
+               tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.raw) } } },
+    scales: { y: { ticks: { callback: v => '€' + Math.round(v/1000) + 'k' } } }
+  }
+});
+
+// ── Income mix donut (Dashboard) ─────────────────────────────────────────────
+const accomTotal  = INC_ACCOM.reduce((a,b) => a+b, 0);
+const drinksTotal = INC_DRINKS.reduce((a,b) => a+b, 0);
+const otherTotals = OTHER_TYPES.map(t => INC_OTHER[t].reduce((a,b)=>a+b,0));
+const mixLabels   = ['Accommodation', 'Drink Sales', ...OTHER_TYPES];
+const mixData     = [accomTotal, drinksTotal, ...otherTotals];
+
+new Chart(document.getElementById('mixChart'), {
+  type: 'doughnut',
+  data: {
+    labels: mixLabels,
+    datasets: [{ data: mixData, backgroundColor: PALETTE.slice(0, mixLabels.length), borderWidth: 2 }]
+  },
+  options: {
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12 } },
+      tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmt(ctx.raw) } }
+    }
+  }
+});
+
+// ── Income trend chart ────────────────────────────────────────────────────────
+const incomeDatasets = [
+  { label: 'Accommodation', data: INC_ACCOM,  backgroundColor: PALETTE[0], stack: 's' },
+  { label: 'Drink Sales',   data: INC_DRINKS, backgroundColor: PALETTE[1], stack: 's' },
+  ...OTHER_TYPES.map((t, i) => ({
+    label: t, data: INC_OTHER[t], backgroundColor: PALETTE[i+2], stack: 's'
+  }))
+];
+
+new Chart(document.getElementById('incomeChart'), {
+  type: 'bar',
+  data: { labels: MONTHS, datasets: incomeDatasets },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { position: 'bottom' },
+               tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.raw) } } },
+    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => '€'+Math.round(v/1000)+'k' } } }
+  }
+});
+
+// ── Expense trend chart ───────────────────────────────────────────────────────
+const expDatasets = EXP_CATS.map((c, i) => ({
+  label: c, data: EXP_ROWS[c], backgroundColor: PALETTE[i % PALETTE.length], stack: 's'
+}));
+
+new Chart(document.getElementById('expChart'), {
+  type: 'bar',
+  data: { labels: MONTHS, datasets: expDatasets },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { position: 'bottom' },
+               tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.raw) } } },
+    scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => '€'+Math.round(v/1000)+'k' } } }
+  }
+});
+
+// ── Month drilldown ───────────────────────────────────────────────────────────
+function drillMonth(ym, label) {
+  const mi = {{ months | tojson }}.indexOf(ym);
+  if (mi < 0) return;
+
+  const rows = [];
+
+  // Income
+  rows.push(['<strong style="color:var(--casetta-brown)">INCOME</strong>', '', '']);
+  rows.push(['Accommodation',  fmt(INC_ACCOM[mi]),  '']);
+  rows.push(['Drink Sales',    fmt(INC_DRINKS[mi]), '']);
+  OTHER_TYPES.forEach(t => rows.push([t, fmt(INC_OTHER[t][mi]), '']));
+  const totalInc = INC_TOTAL[mi];
+  rows.push(['<strong>Total Income</strong>', `<strong>${fmt(totalInc)}</strong>`, '']);
+
+  // Expenses
+  rows.push(['<strong style="color:#dc3545">EXPENSES</strong>', '', '']);
+  EXP_CATS.forEach(c => rows.push([c, fmt(EXP_ROWS[c][mi]), '']));
+  const totalExp = EXP_TOTAL[mi];
+  rows.push(['<strong>Total Expenses</strong>', `<strong>${fmt(totalExp)}</strong>`, '']);
+
+  // Profit
+  const p = PROFIT[mi];
+  const pColor = p >= 0 ? '#198754' : '#dc3545';
+  rows.push([`<strong style="color:${pColor}">NET PROFIT</strong>`,
+             `<strong style="color:${pColor}">${fmt(p)}</strong>`, '']);
+
+  const html = `<table class="table table-sm mb-0">
+    <thead><tr><th>Line</th><th class="text-end">Amount</th><th></th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td class="text-end">${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>
+  </table>`;
+
+  document.getElementById('drillTitle').textContent = label + ' {{ year }} — Detail';
+  document.getElementById('drillBody').innerHTML = html;
+  document.getElementById('drillPanel').style.display = '';
+  document.getElementById('drillPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+{% endblock %}
