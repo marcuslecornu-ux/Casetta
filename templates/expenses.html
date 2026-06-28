@@ -300,8 +300,9 @@
           </thead>
           <tbody>
             {% for m in monthly %}
-            <tr>
-              <td>{{ m[0] }}</td>
+            <tr class="month-drill-row" data-month="{{ m[0] }}" data-year="{{ year_filter }}"
+                style="cursor:pointer" title="Double-click to view expenses">
+              <td>{{ m[0] if m[0] else '—' }}</td>
               <td class="text-end fw-bold">€{{ "%.2f"|format(m.total) }}</td>
             </tr>
             {% else %}
@@ -314,6 +315,76 @@
   </div>
 </div>
 
+
+<!-- ══════════════════ MONTH DRILL-DOWN MODAL ══════════════════ -->
+<div class="modal fade" id="monthModal" tabindex="-1" aria-labelledby="monthModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--casetta-brown);color:#fff">
+        <h5 class="modal-title" id="monthModalLabel"><i class="bi bi-calendar3 me-2"></i><span id="monthModalTitle">Month Detail</span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div id="monthModalLoading" class="text-center py-4"><div class="spinner-border text-secondary"></div></div>
+        <table class="table table-sm table-hover mb-0" id="monthModalTable" style="display:none">
+          <thead class="table-dark">
+            <tr>
+              <th>Date</th><th>Category</th><th>Sub-Category</th><th>Description</th><th>Supplier</th><th class="text-end">Amount €</th>
+            </tr>
+          </thead>
+          <tbody id="monthModalBody"></tbody>
+          <tfoot>
+            <tr class="fw-bold" style="background:var(--casetta-light)">
+              <td colspan="5" class="text-end">Total</td>
+              <td class="text-end" id="monthModalTotal"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.month-drill-row').forEach(function(row) {
+  row.addEventListener('dblclick', function() {
+    var month = this.dataset.month;
+    var year  = this.dataset.year;
+    document.getElementById('monthModalTitle').textContent = month + ' ' + year + ' — All Expenses';
+    document.getElementById('monthModalLoading').style.display = '';
+    document.getElementById('monthModalTable').style.display = 'none';
+    document.getElementById('monthModalBody').innerHTML = '';
+    document.getElementById('monthModalTotal').textContent = '';
+    var modal = new bootstrap.Modal(document.getElementById('monthModal'));
+    modal.show();
+    fetch('/expenses/month-detail?year=' + encodeURIComponent(year) + '&month=' + encodeURIComponent(month))
+      .then(function(r){ return r.json(); })
+      .then(function(rows) {
+        var tbody = document.getElementById('monthModalBody');
+        var total = 0;
+        if (rows.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No expenses found</td></tr>';
+        } else {
+          rows.forEach(function(e) {
+            total += e.amount || 0;
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+              '<td>' + (e.date || '') + '</td>' +
+              '<td>' + (e.category || '') + '</td>' +
+              '<td>' + (e.sub_category || '') + '</td>' +
+              '<td>' + (e.description || '') + '</td>' +
+              '<td>' + (e.supplier || '') + '</td>' +
+              '<td class="text-end">€' + (e.amount || 0).toFixed(2) + '</td>';
+            tbody.appendChild(tr);
+          });
+        }
+        document.getElementById('monthModalTotal').textContent = '€' + total.toFixed(2);
+        document.getElementById('monthModalLoading').style.display = 'none';
+        document.getElementById('monthModalTable').style.display = '';
+      });
+  });
+});
+</script>
 
 <!-- ══════════════════ MAINTENANCE TAB ══════════════════ -->
 {% elif tab == 'maintenance' %}

@@ -600,14 +600,14 @@ def expenses():
 
     conn = get_db()
 
-    # Month normaliser expression — handles any capitalisation (Jan/JAN/jan)
-    _month_norm = """CASE UPPER(month)
+    # Month normaliser — trims whitespace AND normalises capitalisation
+    _month_norm = """CASE TRIM(UPPER(month))
         WHEN 'JAN' THEN 'Jan' WHEN 'FEB' THEN 'Feb' WHEN 'MAR' THEN 'Mar'
         WHEN 'APR' THEN 'Apr' WHEN 'MAY' THEN 'May' WHEN 'JUN' THEN 'Jun'
         WHEN 'JUL' THEN 'Jul' WHEN 'AUG' THEN 'Aug' WHEN 'SEP' THEN 'Sep'
         WHEN 'OCT' THEN 'Oct' WHEN 'NOV' THEN 'Nov' WHEN 'DEC' THEN 'Dec'
-        ELSE month END"""
-    _month_order = """CASE UPPER(month)
+        ELSE TRIM(month) END"""
+    _month_order = """CASE TRIM(UPPER(month))
         WHEN 'JAN' THEN 1 WHEN 'FEB' THEN 2 WHEN 'MAR' THEN 3
         WHEN 'APR' THEN 4 WHEN 'MAY' THEN 5 WHEN 'JUN' THEN 6
         WHEN 'JUL' THEN 7 WHEN 'AUG' THEN 8 WHEN 'SEP' THEN 9
@@ -635,7 +635,7 @@ def expenses():
         monthly = conn.execute(f"""
             SELECT ({_month_norm}) AS month, SUM(amount) AS total
             FROM expenses WHERE year=?
-            GROUP BY UPPER(month)
+            GROUP BY TRIM(UPPER(month))
             ORDER BY {_month_order}
         """, (year_filter,)).fetchall()
 
@@ -803,6 +803,25 @@ def delete_expense_supplier(supplier_id):
     conn.close()
     flash("Supplier removed.", "success")
     return redirect(url_for("expenses", tab="maintenance", cat=category))
+
+
+@app.route("/expenses/month-detail")
+@login_required
+def expenses_month_detail():
+    """Return all expenses for a given year + month as JSON (for modal drill-down)."""
+    year  = request.args.get("year", "")
+    month = request.args.get("month", "")
+    if not year or not month:
+        return jsonify([])
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT date, category, sub_category, description, supplier, amount, reference
+        FROM expenses
+        WHERE year=? AND TRIM(month)=?
+        ORDER BY date, category
+    """, (year, month.strip())).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 
 # ─── BOOKINGS ─────────────────────────────────────────────────────────────────
