@@ -75,6 +75,18 @@ def generate_uid(prefix="", suffix=""):
     return s
 
 
+def log_action(conn, action_type, entity_type, entity_id, description, detail=None):
+    """Insert one row into audit_log. Call this before conn.commit()."""
+    user_id   = current_user.id           if current_user.is_authenticated else None
+    user_name = current_user.display_name if current_user.is_authenticated else "system"
+    ip        = request.remote_addr
+    conn.execute("""
+        INSERT INTO audit_log (user_id, user_name, action_type, entity_type, entity_id, description, detail, ip_address)
+        VALUES (?,?,?,?,?,?,?,?)
+    """, (user_id, user_name, action_type, entity_type, str(entity_id) if entity_id is not None else None,
+          description, json.dumps(detail) if detail else None, ip))
+
+
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
@@ -201,6 +213,12 @@ def sales():
             (quantity, item_id)
         )
 
+        log_action(conn, "CREATE", "drink_sale", uid,
+                   f"Sold {quantity}x {item_name} ({unit_type}) to {data.get('room')} — €{total_sale:.2f}",
+                   {"item_id": item_id, "room": data.get("room"), "quantity": quantity,
+                    "unit_type": unit_type, "unit_price": unit_price, "total": total_sale,
+                    "hosted": bool(is_hosted), "date": sale_date})
+
         conn.commit()
         conn.close()
         flash(f"Sale recorded: {quantity}x {item_name} — €{total_sale:.2f}", "success")
@@ -257,6 +275,9 @@ def edit_sale(uid):
         request.form.get("notes", ""),
         uid
     ))
+    log_action(conn, "UPDATE", "drink_sale", uid,
+               f"Edited sale: {quantity}x {request.form.get('item_name')} — €{total_sale:.2f}",
+               {"room": request.form.get("room"), "quantity": quantity, "total": total_sale})
     conn.commit()
     conn.close()
     flash("Sale updated.", "success")
@@ -267,6 +288,9 @@ def edit_sale(uid):
 @login_required
 def delete_sale(uid):
     conn = get_db()
+    row = conn.execute("SELECT item_name, quantity, room FROM drink_sales WHERE uid=?", (uid,)).fetchone()
+    log_action(conn, "DELETE", "drink_sale", uid,
+               f"Deleted sale: {row['item_name']} x{row['quantity']} ({row['room']})" if row else f"Deleted sale {uid}")
     conn.execute("DELETE FROM drink_sales WHERE uid=?", (uid,))
     conn.commit()
     conn.close()
@@ -359,10 +383,29 @@ def stock():
 
             # Positive = stock in, negative = adjustment down
             if mov_type in ("Purchase", "Adjustment +"):
-                conn.execute("UPDATE stock_items SET current_stock = current_stock + ? WHERE id=?", (qty, item_id))
+                if mov_type == "Purchase" and unit_cost > 0:
+                    # Weighted average cost: blend old stock price with new purchase price
+                    row = conn.execute(
+                        "SELECT current_stock, purchase_price FROM stock_items WHERE id=?", (item_id,)
+                    ).fetchone()
+                    old_qty   = row["current_stock"] if row else 0
+                    old_price = row["purchase_price"] if row else 0
+                    total_qty = old_qty + qty
+                    blended   = ((old_qty * old_price) + (qty * unit_cost)) / total_qty if total_qty else unit_cost
+                    conn.execute(
+                        "UPDATE stock_items SET current_stock = current_stock + ?, purchase_price = ? WHERE id=?",
+                        (qty, round(blended, 4), item_id)
+                    )
+                else:
+                    conn.execute("UPDATE stock_items SET current_stock = current_stock + ? WHERE id=?", (qty, item_id))
             else:
                 conn.execute("UPDATE stock_items SET current_stock = MAX(0, current_stock - ?) WHERE id=?", (qty, item_id))
 
+            log_action(conn, "CREATE", "stock_movement", item_id,
+                       f"{mov_type}: {qty}x {item_row['name'] if item_row else item_id} @ €{unit_cost:.2f}",
+                       {"item_id": item_id, "movement_type": mov_type, "quantity": qty,
+                        "unit_cost": unit_cost, "total": qty * unit_cost,
+                        "notes": request.form.get("notes", "")})
             conn.commit()
             flash("Stock movement recorded.", "success")
 
@@ -386,6 +429,28 @@ def stock():
                       request.form.get("new_region", ""),
                       request.form.get("new_grape", ""),
                       request.form.get("new_bottle_size", "")))
+                conn.commit()
+
+                # Auto-log initial stock as a movement entry for the audit trail
+                new_stock = int(request.form.get("new_stock", 0))
+                new_pp    = float(request.form.get("new_purchase_price", 0))
+                new_name  = request.form.get("new_name", "")
+                if new_stock > 0:
+                    conn.execute("""
+                        INSERT INTO stock_movements
+                        (date, item_id, item_name, movement_type, quantity, unit_cost, total_cost, notes)
+                        VALUES (?,?,?,?,?,?,?,?)
+                    """, (date.today().isoformat(), new_id, new_name,
+                          "New Item", new_stock, new_pp, new_stock * new_pp,
+                          "Auto-logged: new item added to system"))
+                    conn.commit()
+
+                log_action(conn, "CREATE", "stock_item", new_id,
+                           f"New stock item: {request.form.get('new_name')} ({new_id})",
+                           {"category": request.form.get("new_category"),
+                            "purchase_price": float(request.form.get("new_purchase_price", 0)),
+                            "selling_price": float(request.form.get("new_selling_bottle", 0)),
+                            "initial_stock": int(request.form.get("new_stock", 0))})
                 conn.commit()
                 flash(f"New item {new_id} added.", "success")
             else:
@@ -420,6 +485,9 @@ def delete_stock_item(item_id):
     elif item["current_stock"] != 0:
         flash(f"Cannot delete {item_id} — stock level must be zero first.", "warning")
     else:
+        log_action(conn, "DELETE", "stock_item", item_id,
+                   f"Deleted stock item: {item['name']} ({item_id})",
+                   {"name": item["name"], "category": item["category"]})
         conn.execute("DELETE FROM stock_items WHERE id=?", (item_id,))
         conn.commit()
         flash(f"Item {item_id} removed.", "success")
@@ -472,6 +540,10 @@ def expenses():
                     VALUES (?,?,?,?,?,?,?,?,?,?)
                 """, (uid, exp_date, entry_date, category, sub_cat, comments, amount,
                       status, dt.strftime("%b"), dt.year))
+                log_action(conn, "CREATE", "expense", uid,
+                           f"Expense: {category} — €{amount:.2f} ({dt.strftime('%b %Y')})",
+                           {"category": category, "sub_category": sub_cat,
+                            "amount": amount, "month": dt.strftime("%b %Y"), "status": status})
                 conn.commit()
                 flash("Expense recorded.", "success")
         finally:
@@ -552,6 +624,8 @@ def edit_expense(uid):
           request.form.get("sub_category",""), request.form.get("comments",""),
           float(request.form.get("amount",0)), request.form.get("status","Paid"),
           dt.strftime("%b"), dt.year, uid))
+    log_action(conn, "UPDATE", "expense", uid,
+               f"Edited expense: {request.form.get('category')} — €{float(request.form.get('amount',0)):.2f} ({dt.strftime('%b %Y')})")
     conn.commit()
     conn.close()
     flash("Expense updated.", "success")
@@ -562,8 +636,10 @@ def edit_expense(uid):
 @login_required
 def delete_expense(uid):
     conn = get_db()
-    row = conn.execute("SELECT year FROM expenses WHERE uid=?", (uid,)).fetchone()
+    row = conn.execute("SELECT year, category, amount FROM expenses WHERE uid=?", (uid,)).fetchone()
     year = row["year"] if row else date.today().year
+    log_action(conn, "DELETE", "expense", uid,
+               f"Deleted expense: {row['category']} €{row['amount']:.2f}" if row else f"Deleted expense {uid}")
     conn.execute("DELETE FROM expenses WHERE uid=?", (uid,))
     conn.commit()
     conn.close()
@@ -637,7 +713,7 @@ def bookings():
             conn.close()
             return redirect(url_for("bookings"))
 
-        conn.execute("""
+        cur = conn.execute("""
             INSERT INTO bookings
             (entry_date, guest_name, property, room, arrival, num_nights, departure,
              source, source_code, confirmed, rate_type, total_cost, notes)
@@ -652,6 +728,13 @@ def bookings():
               request.form.get("rate_type", "RACK"),
               float(request.form.get("total_cost", 0)),
               request.form.get("notes", "")))
+        new_booking_id = cur.lastrowid
+        log_action(conn, "CREATE", "booking", new_booking_id,
+                   f"Booking: {request.form.get('guest_name')} · {room} · {arrival} ({num_nights} nights)",
+                   {"guest": request.form.get("guest_name"), "property": property_name,
+                    "room": room, "arrival": arrival, "departure": departure,
+                    "num_nights": num_nights, "source": request.form.get("source"),
+                    "confirmed": request.form.get("confirmed"), "total_cost": float(request.form.get("total_cost", 0))})
         conn.commit()
         conn.close()
         flash("Booking saved.", "success")
@@ -736,6 +819,11 @@ def edit_booking(booking_id):
         request.form.get("notes", ""),
         booking_id
     ))
+    log_action(conn, "UPDATE", "booking", booking_id,
+               f"Edited booking #{booking_id}: {request.form.get('guest_name')} · {room} · {arrival}",
+               {"guest": request.form.get("guest_name"), "property": property_name,
+                "room": room, "arrival": arrival, "num_nights": num_nights,
+                "confirmed": request.form.get("confirmed"), "total_cost": float(request.form.get("total_cost", 0))})
     conn.commit()
     conn.close()
     flash("Booking updated.", "success")
@@ -746,6 +834,9 @@ def edit_booking(booking_id):
 @login_required
 def delete_booking(booking_id):
     conn = get_db()
+    row = conn.execute("SELECT guest_name, room, arrival FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    log_action(conn, "DELETE", "booking", booking_id,
+               f"Deleted booking #{booking_id}: {row['guest_name']} · {row['room']} · {row['arrival']}" if row else f"Deleted booking #{booking_id}")
     conn.execute("DELETE FROM bookings WHERE id=?", (booking_id,))
     conn.commit()
     conn.close()
@@ -782,6 +873,54 @@ def manage_rates():
 
 
 # ─── ADMIN ────────────────────────────────────────────────────────────────────
+
+@app.route("/admin/audit")
+@login_required
+def admin_audit():
+    if not current_user.is_admin:
+        flash("Admin access only.", "danger")
+        return redirect(url_for("dashboard"))
+    conn = get_db()
+    # Filters
+    f_type   = request.args.get("type", "")
+    f_entity = request.args.get("entity", "")
+    f_user   = request.args.get("user", "")
+    f_date   = request.args.get("date", "")
+    f_search = request.args.get("q", "")
+
+    query = "SELECT * FROM audit_log WHERE 1=1"
+    params = []
+    if f_type:
+        query += " AND action_type=?"; params.append(f_type)
+    if f_entity:
+        query += " AND entity_type=?"; params.append(f_entity)
+    if f_user:
+        query += " AND user_name=?"; params.append(f_user)
+    if f_date:
+        query += " AND timestamp LIKE ?"; params.append(f_date + "%")
+    if f_search:
+        query += " AND description LIKE ?"; params.append(f"%{f_search}%")
+    query += " ORDER BY timestamp DESC LIMIT 500"
+
+    logs  = conn.execute(query, params).fetchall()
+    users = conn.execute("SELECT DISTINCT user_name FROM audit_log WHERE user_name IS NOT NULL ORDER BY user_name").fetchall()
+    conn.close()
+    return render_template("admin_audit.html", logs=logs, users=users,
+                           f_type=f_type, f_entity=f_entity, f_user=f_user,
+                           f_date=f_date, f_search=f_search)
+
+
+@app.route("/admin/audit/delete/<int:log_id>", methods=["POST"])
+@login_required
+def delete_audit_log(log_id):
+    if not current_user.is_admin:
+        return "Forbidden", 403
+    conn = get_db()
+    conn.execute("DELETE FROM audit_log WHERE id=?", (log_id,))
+    conn.commit()
+    conn.close()
+    return ("", 204)  # silent delete (called via fetch from JS)
+
 
 @app.route("/admin")
 @login_required

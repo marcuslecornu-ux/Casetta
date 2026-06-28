@@ -305,7 +305,7 @@
               <td>{{ m.date }}</td>
               <td><small>{{ m.item_name }}</small></td>
               <td>
-                <span class="badge {{ 'bg-success' if 'Purchase' in m.movement_type or '+' in m.movement_type else 'bg-secondary' }}">
+                <span class="badge {{ 'bg-success' if 'Purchase' in m.movement_type or '+' in m.movement_type or m.movement_type == 'New Item' else 'bg-secondary' }}">
                   {{ m.movement_type }}
                 </span>
               </td>

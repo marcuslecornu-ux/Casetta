@@ -189,6 +189,9 @@
     <a href="/admin" class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
       <i class="bi bi-shield-check"></i><span class="nav-label"> Admin</span>
     </a>
+    <a href="/admin/audit" class="nav-link {% if request.endpoint == 'admin_audit' %}active{% endif %}">
+      <i class="bi bi-journal-text"></i><span class="nav-label"> Audit Log</span>
+    </a>
     {% endif %}
   </nav>
   <div class="sidebar-bottom">

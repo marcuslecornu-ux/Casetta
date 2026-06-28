@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div class="section-title mb-0"><i class="bi bi-journal-text me-2"></i>Audit Log</div>
+  <a href="/admin" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Admin
+  </a>
+</div>
+
+<!-- ── FILTERS ─────────────────────────────────────────────────────── -->
+<form method="GET" class="card mb-4">
+  <div class="card-body py-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4 col-md-3">
+        <label class="form-label form-label-sm mb-1">Search</label>
+        <input type="text" name="q" class="form-control form-control-sm" placeholder="keyword…" value="{{ f_search }}">
+      </div>
+      <div class="col-sm-4 col-md-2">
+        <label class="form-label form-label-sm mb-1">Action</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="CREATE"  {% if f_type == 'CREATE'  %}selected{% endif %}>Create</option>
+          <option value="UPDATE"  {% if f_type == 'UPDATE'  %}selected{% endif %}>Update</option>
+          <option value="DELETE"  {% if f_type == 'DELETE'  %}selected{% endif %}>Delete</option>
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-2">
+        <label class="form-label form-label-sm mb-1">Section</label>
+        <select name="entity" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="booking"        {% if f_entity == 'booking'        %}selected{% endif %}>Bookings</option>
+          <option value="drink_sale"     {% if f_entity == 'drink_sale'     %}selected{% endif %}>Drink Sales</option>
+          <option value="stock_movement" {% if f_entity == 'stock_movement' %}selected{% endif %}>Stock Movements</option>
+          <option value="stock_item"     {% if f_entity == 'stock_item'     %}selected{% endif %}>Stock Items</option>
+          <option value="expense"        {% if f_entity == 'expense'        %}selected{% endif %}>Expenses</option>
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-2">
+        <label class="form-label form-label-sm mb-1">User</label>
+        <select name="user" class="form-select form-select-sm">
+          <option value="">All</option>
+          {% for u in users %}
+          <option value="{{ u.user_name }}" {% if f_user == u.user_name %}selected{% endif %}>{{ u.user_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-md-2">
+        <label class="form-label form-label-sm mb-1">Date</label>
+        <input type="date" name="date" class="form-control form-control-sm" value="{{ f_date }}">
+      </div>
+      <div class="col-sm-4 col-md-1 d-flex gap-1">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filter</button>
+        <a href="/admin/audit" class="btn btn-outline-secondary btn-sm">✕</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- ── LOG TABLE ───────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span>Recent Actions <span class="badge bg-secondary ms-1">{{ logs|length }}</span></span>
+    <small class="text-muted">Showing up to 500 entries</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0" id="auditTable">
+        <thead>
+          <tr>
+            <th style="width:150px">Timestamp</th>
+            <th style="width:100px">User</th>
+            <th style="width:80px">Action</th>
+            <th style="width:110px">Section</th>
+            <th>Description</th>
+            <th style="width:100px" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="text-muted small">{{ log.timestamp[:16].replace('T',' ') }}</td>
+            <td>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border">{{ log.user_name or '—' }}</span>
+            </td>
+            <td>
+              {% if log.action_type == 'CREATE' %}
+                <span class="badge bg-success">Create</span>
+              {% elif log.action_type == 'UPDATE' %}
+                <span class="badge bg-primary">Edit</span>
+              {% elif log.action_type == 'DELETE' %}
+                <span class="badge bg-danger">Delete</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ log.action_type }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% set icons = {
+                'booking': 'bi-calendar-check',
+                'drink_sale': 'bi-cup-straw',
+                'stock_movement': 'bi-arrow-left-right',
+                'stock_item': 'bi-box-seam',
+                'expense': 'bi-receipt'
+              } %}
+              {% set labels = {
+                'booking': 'Booking',
+                'drink_sale': 'Drink Sale',
+                'stock_movement': 'Stock Mvt',
+                'stock_item': 'Stock Item',
+                'expense': 'Expense'
+              } %}
+              <small><i class="bi {{ icons.get(log.entity_type, 'bi-dot') }} me-1 text-muted"></i>{{ labels.get(log.entity_type, log.entity_type) }}</small>
+            </td>
+            <td class="small">{{ log.description }}</td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary btn-sm"
+                        onclick="showDetail({{ log.id }}, {{ log.detail or 'null' }}, '{{ log.entity_type }}', '{{ log.entity_id | default('') }}')"
+                        title="View details">
+                  <i class="bi bi-eye"></i>
+                </button>
+                {% set entity_urls = {
+                    'booking': '/bookings',
+                    'drink_sale': '/sales',
+                    'stock_movement': '/stock#tabHistory',
+                    'stock_item': '/stock#tabInventory',
+                    'expense': '/expenses'
+                } %}
+                <a class="btn btn-outline-primary btn-sm"
+                   href="{{ entity_urls.get(log.entity_type, '/admin') }}"
+                   title="Go to record">
+                  <i class="bi bi-arrow-up-right-square"></i>
+                </a>
+                <button class="btn btn-outline-danger btn-sm"
+                        onclick="deleteLog({{ log.id }}, this)"
+                        title="Delete log entry">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-5">No audit entries found</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── DETAIL MODAL ────────────────────────────────────────────────── -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" id="detailModalHeader">
+        <h5 class="modal-title">Entry Detail</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="detailModalBody">
+        <p class="text-muted">No additional detail recorded.</p>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a id="detailGoLink" href="#" class="btn btn-primary btn-sm">
+          <i class="bi bi-arrow-up-right-square me-1"></i>Go to Record
+        </a>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Entity → URL mapping ──────────────────────────────────────────────────────
+const ENTITY_URLS = {
+  booking:        '/bookings',
+  drink_sale:     '/sales',
+  stock_movement: '/stock#tabHistory',
+  stock_item:     '/stock#tabInventory',
+  expense:        '/expenses',
+};
+
+// ── Detail modal ──────────────────────────────────────────────────────────────
+function showDetail(id, detail, entityType, entityId) {
+  const body = document.getElementById('detailModalBody');
+  const link = document.getElementById('detailGoLink');
+
+  // Build detail table
+  if (detail && typeof detail === 'object') {
+    let rows = Object.entries(detail).map(([k, v]) => {
+      const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const val   = (v === null || v === undefined) ? '—'
+                  : (typeof v === 'boolean') ? (v ? 'Yes' : 'No')
+                  : (typeof v === 'number' && k.includes('cost') || k.includes('price') || k.includes('total'))
+                    ? '€' + parseFloat(v).toFixed(2)
+                  : String(v);
+      return `<tr><th class="text-muted fw-normal" style="width:40%">${label}</th><td><strong>${val}</strong></td></tr>`;
+    }).join('');
+    body.innerHTML = `<table class="table table-sm mb-0">${rows}</table>`;
+  } else {
+    body.innerHTML = '<p class="text-muted mb-0">No additional detail recorded for this action.</p>';
+  }
+
+  // Go-to link
+  const base = ENTITY_URLS[entityType] || '/';
+  link.href = base;
+
+  const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+  modal.show();
+}
+
+// ── Silent delete of a log entry ──────────────────────────────────────────────
+async function deleteLog(id, btn) {
+  if (!confirm('Remove this log entry?')) return;
+  const resp = await fetch(`/admin/audit/delete/${id}`, { method: 'POST' });
+  if (resp.ok) {
+    btn.closest('tr').style.opacity = '0.3';
+    btn.closest('tr').style.pointerEvents = 'none';
+    setTimeout(() => btn.closest('tr').remove(), 400);
+  } else {
+    alert('Could not delete entry.');
+  }
+}
+</script>
+{% endblock %}

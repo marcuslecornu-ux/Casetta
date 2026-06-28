@@ -323,6 +323,19 @@ def init_db():
             active INTEGER DEFAULT 1,
             UNIQUE(category, name)
         );
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT (datetime('now')),
+            user_id INTEGER,
+            user_name TEXT,
+            action_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT,
+            description TEXT NOT NULL,
+            detail TEXT,
+            ip_address TEXT
+        );
     """)
 
     # Migrations — add columns silently if they don't exist yet
