@@ -1038,6 +1038,136 @@ def change_password():
     return redirect(url_for("admin"))
 
 
+# ─── OTHER INCOME ─────────────────────────────────────────────────────────────
+
+@app.route("/other-income", methods=["GET", "POST"])
+@login_required
+def other_income():
+    conn = get_db()
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "add":
+            qty        = float(request.form.get("quantity", 1))
+            unit_price = float(request.form.get("unit_price", 0))
+            total      = qty * unit_price
+            uid        = generate_uid("INC")
+            conn.execute("""
+                INSERT INTO other_income
+                (uid, date, type, sub_type, comments, unit_label, quantity, unit_price, total)
+                VALUES (?,?,?,?,?,?,?,?,?)
+            """, (uid,
+                  request.form.get("date", date.today().isoformat()),
+                  request.form.get("type"),
+                  request.form.get("sub_type"),
+                  request.form.get("comments", ""),
+                  request.form.get("unit_label", "Units"),
+                  qty, unit_price, total))
+            log_action(conn, "CREATE", "other_income", uid,
+                       f"{request.form.get('sub_type')} — {qty} {request.form.get('unit_label','Units')} @ €{unit_price:.2f} = €{total:.2f}",
+                       {"type": request.form.get("type"), "sub_type": request.form.get("sub_type"),
+                        "quantity": qty, "unit_price": unit_price, "total": total})
+            conn.commit()
+            flash("Income recorded.", "success")
+
+        elif action == "add_category":
+            cat_type = request.form.get("cat_type", "").strip()
+            cat_sub  = request.form.get("cat_sub", "").strip()
+            if cat_type and cat_sub:
+                try:
+                    conn.execute("INSERT INTO other_income_categories (type, sub_type) VALUES (?,?)", (cat_type, cat_sub))
+                    log_action(conn, "CREATE", "other_income_category", None,
+                               f"Category added: {cat_type} / {cat_sub}")
+                    conn.commit()
+                    flash(f"Added '{cat_sub}' under '{cat_type}'.", "success")
+                except Exception:
+                    flash("Category already exists.", "warning")
+            else:
+                flash("Both Type and Sub-type are required.", "warning")
+
+        elif action == "delete_category":
+            cat_id = request.form.get("cat_id")
+            row = conn.execute("SELECT type, sub_type FROM other_income_categories WHERE id=?", (cat_id,)).fetchone()
+            log_action(conn, "DELETE", "other_income_category", cat_id,
+                       f"Category deleted: {row['type']} / {row['sub_type']}" if row else f"Category {cat_id} deleted")
+            conn.execute("DELETE FROM other_income_categories WHERE id=?", (cat_id,))
+            conn.commit()
+            flash("Category removed.", "success")
+
+        conn.close()
+        return redirect(url_for("other_income"))
+
+    # GET — load records and categories
+    year_filter = request.args.get("year", str(date.today().year))
+    records = conn.execute(
+        "SELECT * FROM other_income WHERE date LIKE ? ORDER BY date DESC, created_at DESC",
+        (f"{year_filter}%",)
+    ).fetchall()
+    categories = conn.execute(
+        "SELECT * FROM other_income_categories WHERE active=1 ORDER BY type, sub_type"
+    ).fetchall()
+    years = conn.execute(
+        "SELECT DISTINCT substr(date,1,4) AS yr FROM other_income ORDER BY yr DESC"
+    ).fetchall()
+    conn.close()
+
+    # Build type → sub_types map for JS
+    cat_map = {}
+    for c in categories:
+        cat_map.setdefault(c["type"], []).append(c["sub_type"])
+
+    cat_types = sorted(cat_map.keys())
+    return render_template("other_income.html",
+        records=records,
+        categories=categories,
+        cat_map_json=json.dumps(cat_map),
+        cat_types=cat_types,
+        years=["all"] + [r["yr"] for r in years] + ([str(date.today().year)] if str(date.today().year) not in [r["yr"] for r in years] else []),
+        year_filter=year_filter,
+        today=date.today().isoformat(),
+    )
+
+
+@app.route("/other-income/edit/<uid>", methods=["POST"])
+@login_required
+def edit_other_income(uid):
+    conn = get_db()
+    qty        = float(request.form.get("quantity", 1))
+    unit_price = float(request.form.get("unit_price", 0))
+    total      = qty * unit_price
+    conn.execute("""
+        UPDATE other_income
+        SET date=?, type=?, sub_type=?, comments=?, unit_label=?, quantity=?, unit_price=?, total=?
+        WHERE uid=?
+    """, (request.form.get("date"),
+          request.form.get("type"),
+          request.form.get("sub_type"),
+          request.form.get("comments", ""),
+          request.form.get("unit_label", "Units"),
+          qty, unit_price, total, uid))
+    log_action(conn, "UPDATE", "other_income", uid,
+               f"Edited: {request.form.get('sub_type')} — {qty} @ €{unit_price:.2f} = €{total:.2f}")
+    conn.commit()
+    conn.close()
+    flash("Record updated.", "success")
+    return redirect(url_for("other_income"))
+
+
+@app.route("/other-income/delete/<uid>", methods=["POST"])
+@login_required
+def delete_other_income(uid):
+    conn = get_db()
+    row = conn.execute("SELECT sub_type, quantity, total FROM other_income WHERE uid=?", (uid,)).fetchone()
+    log_action(conn, "DELETE", "other_income", uid,
+               f"Deleted: {row['sub_type']} — €{row['total']:.2f}" if row else f"Deleted income {uid}")
+    conn.execute("DELETE FROM other_income WHERE uid=?", (uid,))
+    conn.commit()
+    conn.close()
+    flash("Record deleted.", "success")
+    return redirect(url_for("other_income"))
+
+
 @app.route("/menus")
 @login_required
 def menus():

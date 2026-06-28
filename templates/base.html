@@ -182,6 +182,9 @@
     <a href="/bookings" class="nav-link {% if request.endpoint in ['bookings', 'bookings_calendar'] %}active{% endif %}">
       <i class="bi bi-calendar-check"></i><span class="nav-label"> Bookings</span>
     </a>
+    <a href="/other-income" class="nav-link {% if request.endpoint in ['other_income', 'edit_other_income', 'delete_other_income'] %}active{% endif %}">
+      <i class="bi bi-cash-coin"></i><span class="nav-label"> Other Income</span>
+    </a>
     <a href="/menus" class="nav-link {% if request.endpoint == 'menus' %}active{% endif %}">
       <i class="bi bi-book"></i><span class="nav-label"> Menus</span>
     </a>

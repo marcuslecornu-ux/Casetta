@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Other Income{% endblock %}
+
+{% block content %}
+<div class="section-title"><i class="bi bi-cash-coin me-2"></i>Other Income</div>
+
+<ul class="nav nav-tabs mb-4" id="incomeTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabRecord">Record Income</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCategories">Manage Categories</a></li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ── RECORD INCOME ─────────────────────────────────────────────── -->
+  <div class="tab-pane fade show active" id="tabRecord">
+    <div class="row g-4">
+
+      <!-- Entry form -->
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-header">Record Income</div>
+          <div class="card-body">
+            <form method="POST">
+              <input type="hidden" name="action" value="add">
+
+              <div class="mb-3">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-control" value="{{ today }}" required>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Type</label>
+                <select name="type" id="incType" class="form-select" required onchange="filterSubTypes()">
+                  <option value="">— Select type —</option>
+                  {% for t in cat_types %}
+                  <option value="{{ t }}">{{ t }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Sub-type</label>
+                <select name="sub_type" id="incSubType" class="form-select" required>
+                  <option value="">— Select type first —</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Comments</label>
+                <textarea name="comments" class="form-control" rows="2" placeholder="Details, guest name, description…"></textarea>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <label class="form-label">Unit</label>
+                  <select name="unit_label" class="form-select">
+                    <option value="Units">Units</option>
+                    <option value="People">People</option>
+                    <option value="kg">kg</option>
+                    <option value="Bottles">Bottles</option>
+                    <option value="Items">Items</option>
+                  </select>
+                </div>
+                <div class="col-4">
+                  <label class="form-label">Quantity</label>
+                  <input type="number" name="quantity" id="incQty" class="form-control" value="1" min="0" step="0.5" required oninput="calcTotal()">
+                </div>
+                <div class="col-4">
+                  <label class="form-label">Unit Price (€)</label>
+                  <input type="number" name="unit_price" id="incPrice" class="form-control" value="0" step="0.01" min="0" oninput="calcTotal()">
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Total (€)</label>
+                <input type="text" id="incTotal" class="form-control" value="0.00" readonly
+                       style="background:var(--casetta-light);font-weight:600;font-size:1.1rem">
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-check-circle me-2"></i>Record Income
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Income history -->
+      <div class="col-md-7">
+        <!-- Year filter -->
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+          {% for y in years %}
+          <a href="/other-income?year={{ y }}"
+             class="btn btn-sm {% if y == year_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+            {{ y }}
+          </a>
+          {% endfor %}
+          <span class="ms-auto text-muted small">Double-click a row to edit</span>
+        </div>
+
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Income Records — {{ year_filter }}</span>
+            <strong class="text-success">
+              Total: €{{ "%.2f"|format(records|sum(attribute='total')) }}
+            </strong>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="incomeTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Sub-type</th>
+                    <th>Comments</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-end">Unit €</th>
+                    <th class="text-end">Total €</th>
+                    <th style="width:40px"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in records %}
+                  <tr class="income-row" style="cursor:pointer"
+                      data-uid="{{ r.uid }}"
+                      data-date="{{ r.date }}"
+                      data-type="{{ r.type }}"
+                      data-sub="{{ r.sub_type }}"
+                      data-comments="{{ r.comments or '' }}"
+                      data-unit="{{ r.unit_label }}"
+                      data-qty="{{ r.quantity }}"
+                      data-price="{{ r.unit_price }}"
+                      data-total="{{ r.total }}"
+                      ondblclick="openEdit(this)">
+                    <td>{{ r.date }}</td>
+                    <td><small class="text-muted">{{ r.type }}</small></td>
+                    <td><strong>{{ r.sub_type }}</strong></td>
+                    <td><small>{{ r.comments or '—' }}</small></td>
+                    <td class="text-center">{{ r.quantity|int if r.quantity == r.quantity|int else r.quantity }} {{ r.unit_label }}</td>
+                    <td class="text-end">€{{ "%.2f"|format(r.unit_price) }}</td>
+                    <td class="text-end"><strong>€{{ "%.2f"|format(r.total) }}</strong></td>
+                    <td>
+                      <form method="POST" action="/other-income/delete/{{ r.uid }}"
+                            onsubmit="return confirm('Delete this record?')" style="display:inline">
+                        <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Delete">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No income records for {{ year_filter }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MANAGE CATEGORIES ─────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="tabCategories">
+    <div class="row g-4">
+
+      <!-- Add category form -->
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header">Add Category</div>
+          <div class="card-body">
+            <form method="POST">
+              <input type="hidden" name="action" value="add_category">
+              <div class="mb-3">
+                <label class="form-label">Type <small class="text-muted">(e.g. Meals)</small></label>
+                <input type="text" name="cat_type" class="form-control" placeholder="Type name" required list="existingTypes">
+                <datalist id="existingTypes">
+                  {% for t in cat_types %}
+                  <option value="{{ t }}">
+                  {% endfor %}
+                </datalist>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Sub-type <small class="text-muted">(e.g. Dinner)</small></label>
+                <input type="text" name="cat_sub" class="form-control" placeholder="Sub-type name" required>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-plus-circle me-1"></i>Add
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category list -->
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header">All Categories</div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr><th>Type</th><th>Sub-type</th><th style="width:60px"></th></tr>
+              </thead>
+              <tbody>
+                {% set ns = namespace(last_type='') %}
+                {% for cat in categories %}
+                <tr>
+                  <td>
+                    {% if cat.type != ns.last_type %}
+                      <strong>{{ cat.type }}</strong>
+                      {% set ns.last_type = cat.type %}
+                    {% endif %}
+                  </td>
+                  <td>{{ cat.sub_type }}</td>
+                  <td>
+                    <form method="POST" onsubmit="return confirm('Remove category?')" style="display:inline">
+                      <input type="hidden" name="action" value="delete_category">
+                      <input type="hidden" name="cat_id" value="{{ cat.id }}">
+                      <button type="submit" class="btn btn-link btn-sm text-danger p-0">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- tab-content -->
+
+<!-- ── EDIT MODAL ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--casetta-brown);color:#fff">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Income Record</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editForm">
+        <input type="hidden" name="action" value="edit">
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" name="date" id="e_date" class="form-control" required>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Type</label>
+              <select name="type" id="e_type" class="form-select" required onchange="filterEditSubTypes()">
+                {% for t in cat_types %}
+                <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Sub-type</label>
+              <select name="sub_type" id="e_sub_type" class="form-select" required></select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Comments</label>
+            <textarea name="comments" id="e_comments" class="form-control" rows="2"></textarea>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="form-label">Unit</label>
+              <select name="unit_label" id="e_unit" class="form-select">
+                <option value="Units">Units</option>
+                <option value="People">People</option>
+                <option value="kg">kg</option>
+                <option value="Bottles">Bottles</option>
+                <option value="Items">Items</option>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label">Quantity</label>
+              <input type="number" name="quantity" id="e_qty" class="form-control" step="0.5" min="0" oninput="calcEditTotal()">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Unit Price (€)</label>
+              <input type="number" name="unit_price" id="e_price" class="form-control" step="0.01" min="0" oninput="calcEditTotal()">
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">Total (€)</label>
+            <input type="text" id="e_total" class="form-control" readonly
+                   style="background:var(--casetta-light);font-weight:600">
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CAT_MAP = {{ cat_map_json | safe }};
+
+// ── Sub-type filtering ────────────────────────────────────────────────────────
+function filterSubTypes() {
+  const type = document.getElementById("incType").value;
+  const sel  = document.getElementById("incSubType");
+  sel.innerHTML = '<option value="">— Select —</option>';
+  (CAT_MAP[type] || []).forEach(s => {
+    sel.innerHTML += `<option value="${s}">${s}</option>`;
+  });
+}
+
+function filterEditSubTypes(currentVal) {
+  const type = document.getElementById("e_type").value;
+  const sel  = document.getElementById("e_sub_type");
+  sel.innerHTML = '';
+  (CAT_MAP[type] || []).forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    if (s === currentVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Total calculation ─────────────────────────────────────────────────────────
+function calcTotal() {
+  const qty   = parseFloat(document.getElementById("incQty").value)   || 0;
+  const price = parseFloat(document.getElementById("incPrice").value) || 0;
+  document.getElementById("incTotal").value = "€" + (qty * price).toFixed(2);
+}
+
+function calcEditTotal() {
+  const qty   = parseFloat(document.getElementById("e_qty").value)   || 0;
+  const price = parseFloat(document.getElementById("e_price").value) || 0;
+  document.getElementById("e_total").value = "€" + (qty * price).toFixed(2);
+}
+
+// ── Open edit modal on double-click ──────────────────────────────────────────
+function openEdit(row) {
+  const d = row.dataset;
+  document.getElementById("editForm").action = `/other-income/edit/${d.uid}`;
+  document.getElementById("e_date").value     = d.date;
+  document.getElementById("e_comments").value = d.comments;
+  document.getElementById("e_unit").value     = d.unit;
+  document.getElementById("e_qty").value      = d.qty;
+  document.getElementById("e_price").value    = d.price;
+  document.getElementById("e_total").value    = "€" + parseFloat(d.total).toFixed(2);
+
+  // Set type first, then populate and set sub_type
+  document.getElementById("e_type").value = d.type;
+  filterEditSubTypes(d.sub);
+
+  new bootstrap.Modal(document.getElementById("editModal")).show();
+}
+</script>
+{% endblock %}

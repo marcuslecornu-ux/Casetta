@@ -336,7 +336,48 @@ def init_db():
             detail TEXT,
             ip_address TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS other_income_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            sub_type TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
+            UNIQUE(type, sub_type)
+        );
+
+        CREATE TABLE IF NOT EXISTS other_income (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uid TEXT UNIQUE NOT NULL,
+            date TEXT NOT NULL,
+            type TEXT NOT NULL,
+            sub_type TEXT NOT NULL,
+            comments TEXT DEFAULT '',
+            unit_label TEXT DEFAULT 'Units',
+            quantity REAL DEFAULT 1,
+            unit_price REAL DEFAULT 0,
+            total REAL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
     """)
+
+    # Seed other_income_categories if empty
+    if not c.execute("SELECT 1 FROM other_income_categories LIMIT 1").fetchone():
+        seed_cats = [
+            ("Olive Oil",   "Olive Oil"),
+            ("Enrichment",  "Enrichment"),
+            ("Meals",       "Cooking Class"),
+            ("Meals",       "Olives & Nuts"),
+            ("Meals",       "Cheese"),
+            ("Meals",       "Curated Meats"),
+            ("Meals",       "Brunch"),
+            ("Meals",       "Lunch"),
+            ("Meals",       "Apertivo"),
+            ("Meals",       "Dinner"),
+            ("Laundry",     "Laundry"),
+            ("Other",       "Other"),
+        ]
+        c.executemany("INSERT OR IGNORE INTO other_income_categories (type, sub_type) VALUES (?,?)", seed_cats)
+        conn.commit()
 
     # Migrations — add columns silently if they don't exist yet
     migrations = [
