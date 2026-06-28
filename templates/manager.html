@@ -215,7 +215,10 @@ function openEditMgr(row) {
 
   var ed = row.dataset.entry || row.dataset.date;
   document.getElementById('mgr-entry-date').value    = ed;
-  document.getElementById('mgr-expense-month').value = row.dataset.date ? row.dataset.date.substring(0,7) : '';
+  // data-month is YYYYMM (e.g. "202603") — convert to YYYY-MM for the month input
+  var dm = row.dataset.month || '';
+  var period = dm.length === 6 ? dm.substring(0,4) + '-' + dm.substring(4,6) : '';
+  document.getElementById('mgr-expense-month').value = period;
   document.getElementById('mgr-category').value      = row.dataset.category || '';
   document.getElementById('mgr-sub').value           = row.dataset.sub      || '';
   document.getElementById('mgr-comments').value      = row.dataset.comments || '';
