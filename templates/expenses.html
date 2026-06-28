@@ -729,6 +729,8 @@ document.addEventListener('click', function(e) {
         btn.innerHTML = '<i class="bi bi-check-lg"></i>';
         btn.classList.replace('btn-outline-success', 'btn-success');
       }, 1500);
+    } else {
+      alert(res.error || 'Save failed');
     }
   });
 });

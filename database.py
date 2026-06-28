@@ -866,11 +866,17 @@ def init_db():
         ("CAPITAL PROJECTS", "Agriturismo",                    1.00, 0.00, 0.00),
         ("CAPITAL PROJECTS", "Farm",                           0.00, 1.00, 0.00),
     ]
-    for cat, name, pc, pf, pp in SUPPLIER_SPLIT_SEEDS:
-        c.execute("""
-            UPDATE expense_suppliers SET pct_casetta=?, pct_farm=?, pct_personal=?
-            WHERE category=? AND name=?
-        """, (pc, pf, pp, cat, name))
+    # Only seed supplier splits if they haven't been customised yet
+    # (i.e. all rows still have the column defaults 1.0/0.0/0.0)
+    already_split = c.execute(
+        "SELECT COUNT(*) FROM expense_suppliers WHERE pct_farm > 0 OR pct_personal > 0"
+    ).fetchone()[0]
+    if not already_split:
+        for cat, name, pc, pf, pp in SUPPLIER_SPLIT_SEEDS:
+            c.execute("""
+                UPDATE expense_suppliers SET pct_casetta=?, pct_farm=?, pct_personal=?
+                WHERE category=? AND name=?
+            """, (pc, pf, pp, cat, name))
 
     conn.commit()
 

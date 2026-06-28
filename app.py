@@ -738,9 +738,12 @@ def add_expense_supplier():
 def update_supplier_splits(supplier_id):
     """Save Casetta/Farm/Personal split % for a supplier (called via fetch)."""
     data = request.get_json(force=True)
-    pc = float(data.get("pct_casetta", 0))
-    pf = float(data.get("pct_farm", 0))
-    pp = float(data.get("pct_personal", 0))
+    pc = round(float(data.get("pct_casetta", 0)), 4)
+    pf = round(float(data.get("pct_farm", 0)), 4)
+    pp = round(float(data.get("pct_personal", 0)), 4)
+    total = round(pc + pf + pp, 4)
+    if abs(total - 1.0) > 0.01:
+        return jsonify({"ok": False, "error": f"Splits must sum to 100% (got {round(total*100)}%)"}), 400
     conn = get_db()
     conn.execute("""
         UPDATE expense_suppliers SET pct_casetta=?, pct_farm=?, pct_personal=? WHERE id=?
@@ -756,11 +759,14 @@ def update_category_splits():
     """Save Casetta/Farm/Personal split % for a category (called via fetch)."""
     data = request.get_json(force=True)
     category = data.get("category", "")
-    pc = float(data.get("pct_casetta", 0))
-    pf = float(data.get("pct_farm", 0))
-    pp = float(data.get("pct_personal", 0))
+    pc = round(float(data.get("pct_casetta", 0)), 4)
+    pf = round(float(data.get("pct_farm", 0)), 4)
+    pp = round(float(data.get("pct_personal", 0)), 4)
     if not category:
         return jsonify({"ok": False, "error": "no category"}), 400
+    total = round(pc + pf + pp, 4)
+    if abs(total - 1.0) > 0.01:
+        return jsonify({"ok": False, "error": f"Splits must sum to 100% (got {round(total*100)}%)"}), 400
     conn = get_db()
     conn.execute("""
         INSERT INTO expense_category_splits (category, pct_casetta, pct_farm, pct_personal)

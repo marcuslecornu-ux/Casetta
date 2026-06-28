@@ -226,15 +226,13 @@
                 <i class="bi bi-graph-down-arrow me-1"></i>Expenses — <span id="plStreamLabel">All</span>
               </td>
             </tr>
-            <tbody id="plExpBody">
             {% for cat in exp_cats %}
-            <tr>
+            <tr class="pl-exp-cat-row">
               <td class="ps-3 text-muted">{{ cat }}</td>
               {% for v in exp_rows[cat] %}<td class="text-end">{{ fmtd(v) }}</td>{% endfor %}
               <td class="text-end fw-bold">{{ fmt(row_total(exp_rows[cat])) }}</td>
             </tr>
             {% endfor %}
-            </tbody>
             <tr class="table-danger fw-bold" id="plExpTotal">
               <td>Total Expenses</td>
               {% for v in exp_total %}<td class="text-end">{{ fmt(v) }}</td>{% endfor %}
@@ -492,22 +490,22 @@ function setStream(stream) {
 }
 
 function rebuildPLExpRows(stream) {
-  const body = document.getElementById('plExpBody');
+  const expRows = EXP_DATA[stream];
+  const expTotals = EXP_STREAM_TOTALS[stream];
   const totalRow = document.getElementById('plExpTotal');
   const profitRow = document.getElementById('plProfitRow');
   const marginRow = document.getElementById('plMarginRow');
-  if (!body) return;
 
-  const expRows = EXP_DATA[stream];
-  const expTotals = EXP_STREAM_TOTALS[stream];
-
-  // Category rows
-  body.innerHTML = EXP_CATS.map(cat => {
+  // Update category rows in-place (avoids nested tbody)
+  const catRows = document.querySelectorAll('#plTable .pl-exp-cat-row');
+  catRows.forEach((tr, idx) => {
+    const cat = EXP_CATS[idx];
+    if (!cat) return;
     const vals = expRows[cat] || Array(12).fill(0);
     const tot = sumArr(vals);
     const cells = vals.map(v => `<td class="text-end">${v ? fmt(v) : '—'}</td>`).join('');
-    return `<tr><td class="ps-3 text-muted">${cat}</td>${cells}<td class="text-end fw-bold">${fmt(tot)}</td></tr>`;
-  }).join('');
+    tr.innerHTML = `<td class="ps-3 text-muted">${cat}</td>${cells}<td class="text-end fw-bold">${fmt(tot)}</td>`;
+  });
 
   // Total expenses row
   const totCells = expTotals.map(v => `<td class="text-end">${v ? fmt(v) : '—'}</td>`).join('');
