@@ -358,7 +358,7 @@ document.querySelectorAll('.month-drill-row').forEach(function(row) {
     var modal = new bootstrap.Modal(document.getElementById('monthModal'));
     modal.show();
     fetch('/expenses/month-detail?year=' + encodeURIComponent(year) + '&month=' + encodeURIComponent(month))
-      .then(function(r){ return r.json(); })
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function(rows) {
         var tbody = document.getElementById('monthModalBody');
         var total = 0;
@@ -381,6 +381,10 @@ document.querySelectorAll('.month-drill-row').forEach(function(row) {
         document.getElementById('monthModalTotal').textContent = '€' + total.toFixed(2);
         document.getElementById('monthModalLoading').style.display = 'none';
         document.getElementById('monthModalTable').style.display = '';
+      })
+      .catch(function(err) {
+        document.getElementById('monthModalLoading').innerHTML =
+          '<p class="text-danger py-3">Could not load data: ' + err.message + '</p>';
       });
   });
 });
