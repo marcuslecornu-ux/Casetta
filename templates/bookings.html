@@ -353,6 +353,10 @@
           </div>
         </div>
         <div class="modal-footer">
+          <button type="button" class="btn btn-outline-danger btn-sm me-auto"
+                  onclick="deleteBooking()">
+            <i class="bi bi-trash me-1"></i>Delete
+          </button>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Update Booking</button>
         </div>
@@ -360,6 +364,9 @@
     </div>
   </div>
 </div>
+
+<!-- Hidden delete form (outside edit form to avoid nesting) -->
+<form id="deleteBookingForm" method="POST" style="display:none"></form>
 
 {% endblock %}
 
@@ -407,8 +414,9 @@ function calcDep() {
 function openEdit(row) {
   const d = row.dataset;
 
-  // Set form POST target
+  // Set form POST targets for both edit and delete
   document.getElementById("editForm").action = "/bookings/edit/" + d.id;
+  document.getElementById("deleteBookingForm").action = "/bookings/delete/" + d.id;
 
   // Basic fields
   document.getElementById("e_guest").value   = d.guest;
@@ -432,6 +440,13 @@ function openEdit(row) {
   document.getElementById("e_confirmed").value = d.confirmed;
 
   new bootstrap.Modal(document.getElementById("editModal")).show();
+}
+
+function deleteBooking() {
+  const guest = document.getElementById("e_guest").value || "this booking";
+  if (!confirm(`Delete booking for "${guest}"? This cannot be undone.`)) return;
+  bootstrap.Modal.getInstance(document.getElementById("editModal")).hide();
+  document.getElementById("deleteBookingForm").submit();
 }
 </script>
 {% endblock %}

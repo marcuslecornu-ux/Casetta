@@ -742,6 +742,17 @@ def edit_booking(booking_id):
     return redirect(url_for("bookings"))
 
 
+@app.route("/bookings/delete/<int:booking_id>", methods=["POST"])
+@login_required
+def delete_booking(booking_id):
+    conn = get_db()
+    conn.execute("DELETE FROM bookings WHERE id=?", (booking_id,))
+    conn.commit()
+    conn.close()
+    flash("Booking deleted.", "success")
+    return redirect(url_for("bookings"))
+
+
 @app.route("/bookings/rates", methods=["POST"])
 @login_required
 def manage_rates():
