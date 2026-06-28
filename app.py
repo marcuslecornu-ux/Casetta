@@ -600,14 +600,30 @@ def expenses():
 
     conn = get_db()
 
+    # Month normaliser expression — handles any capitalisation (Jan/JAN/jan)
+    _month_norm = """CASE UPPER(month)
+        WHEN 'JAN' THEN 'Jan' WHEN 'FEB' THEN 'Feb' WHEN 'MAR' THEN 'Mar'
+        WHEN 'APR' THEN 'Apr' WHEN 'MAY' THEN 'May' WHEN 'JUN' THEN 'Jun'
+        WHEN 'JUL' THEN 'Jul' WHEN 'AUG' THEN 'Aug' WHEN 'SEP' THEN 'Sep'
+        WHEN 'OCT' THEN 'Oct' WHEN 'NOV' THEN 'Nov' WHEN 'DEC' THEN 'Dec'
+        ELSE month END"""
+    _month_order = """CASE UPPER(month)
+        WHEN 'JAN' THEN 1 WHEN 'FEB' THEN 2 WHEN 'MAR' THEN 3
+        WHEN 'APR' THEN 4 WHEN 'MAY' THEN 5 WHEN 'JUN' THEN 6
+        WHEN 'JUL' THEN 7 WHEN 'AUG' THEN 8 WHEN 'SEP' THEN 9
+        WHEN 'OCT' THEN 10 WHEN 'NOV' THEN 11 WHEN 'DEC' THEN 12 END"""
+
     if year_filter == "all":
         all_expenses = conn.execute("SELECT * FROM expenses ORDER BY date DESC").fetchall()
         totals = conn.execute(
             "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses GROUP BY category ORDER BY total DESC"
         ).fetchall()
-        monthly = conn.execute(
-            "SELECT year||'-'||month AS ym, SUM(amount) as total FROM expenses GROUP BY year, month ORDER BY year DESC, date DESC"
-        ).fetchall()
+        monthly = conn.execute(f"""
+            SELECT year || '-' || ({_month_norm}) AS ym, SUM(amount) AS total
+            FROM expenses
+            GROUP BY year, UPPER(month)
+            ORDER BY year DESC, {_month_order}
+        """).fetchall()
     else:
         all_expenses = conn.execute(
             "SELECT * FROM expenses WHERE year=? ORDER BY date DESC", (year_filter,)
@@ -616,15 +632,12 @@ def expenses():
             "SELECT category, SUM(amount) as total, COUNT(*) as cnt FROM expenses WHERE year=? GROUP BY category ORDER BY total DESC",
             (year_filter,)
         ).fetchall()
-        monthly = conn.execute(
-            """SELECT month, SUM(amount) as total FROM expenses WHERE year=?
-               GROUP BY month ORDER BY
-               CASE month WHEN 'Jan' THEN 1 WHEN 'Feb' THEN 2 WHEN 'Mar' THEN 3
-               WHEN 'Apr' THEN 4 WHEN 'May' THEN 5 WHEN 'Jun' THEN 6
-               WHEN 'Jul' THEN 7 WHEN 'Aug' THEN 8 WHEN 'Sep' THEN 9
-               WHEN 'Oct' THEN 10 WHEN 'Nov' THEN 11 WHEN 'Dec' THEN 12 END""",
-            (year_filter,)
-        ).fetchall()
+        monthly = conn.execute(f"""
+            SELECT ({_month_norm}) AS month, SUM(amount) AS total
+            FROM expenses WHERE year=?
+            GROUP BY UPPER(month)
+            ORDER BY {_month_order}
+        """, (year_filter,)).fetchall()
 
     years = conn.execute("SELECT DISTINCT year FROM expenses ORDER BY year DESC").fetchall()
 
