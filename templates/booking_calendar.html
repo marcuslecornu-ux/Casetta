@@ -397,12 +397,23 @@ function renderCalendar() {
 
   const rooms = curProp === 'Casetta' ? CASETTA_ROOMS : FOL_ROOMS;
 
-  // Normalise room name: strip property prefix e.g. "Casetta Whole House" → "Whole House"
+  // Normalise room name to match CASETTA_ROOMS / FOL_ROOMS display values
   function normRoom(r) {
-    return (r || 'Whole House')
-      .replace(/^Casetta\s+/i, '')
-      .replace(/^Folegandros\s+/i, '')
-      .trim();
+    if (!r) return 'Whole House';
+    const u = r.trim().toUpperCase();
+    // Whole House variants
+    if (['CASETTA WH','CASETTA WHOLE HOUSE','WHOLE HOUSE','WH',
+         'FOLEGANDROS','FOLEGANDROS WHOLE HOUSE'].includes(u)) return 'Whole House';
+    // Individual rooms (stored upper or mixed case)
+    if (u === 'MENTA')     return 'Menta';
+    if (u === 'LAVANDA')   return 'Lavanda';
+    if (u === 'SALVIA')    return 'Salvia';
+    if (u === 'PREZZEMOLO') return 'Prezzemolo';
+    if (u === 'CANTINA')   return 'Cantina';
+    // Strip leading property name and recurse once
+    const stripped = r.replace(/^casetta\s+/i,'').replace(/^folegandros\s+/i,'').trim();
+    if (stripped !== r) return normRoom(stripped);
+    return r.trim();
   }
 
   // Resolve departure: use stored value or calculate from num_nights

@@ -342,6 +342,20 @@ def init_db():
         except Exception:
             pass
 
+    # Remove duplicate bookings — keep the lowest id for each (guest, arrival, room) combination
+    try:
+        c.execute("""
+            DELETE FROM bookings
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM bookings
+                GROUP BY guest_name, arrival, room, COALESCE(property, 'Casetta')
+            )
+        """)
+        conn.commit()
+    except Exception:
+        pass
+
     # Backfill entry_date = date for existing expense records
     try:
         c.execute("UPDATE expenses SET entry_date=date WHERE entry_date IS NULL OR entry_date=''")
