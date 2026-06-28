@@ -55,6 +55,14 @@ STOCK_ITEMS = [
     ("SW1003", "Sparkling", "Marchese Antinori Spumante",          19.52,  58.00),
     ("SW1004", "Sparkling", "Villa Folini Prosecco Rosè",           6.90,  25.00),
     ("SW1005", "Sparkling", "Franciacorta Corte Aura 2021",        14.23,  39.00),
+    ("SW1006", "Sparkling", "Louis Roederer Cristal 2015",          0.00, 820.00),
+    ("SW1007", "Sparkling", "Krug Gran Cuvée Edition 171",          0.00, 760.00),
+    ("SW1008", "Sparkling", "Krug Gran Cuvée Edition 168",          0.00, 720.00),
+    ("SW1009", "Sparkling", "Dom Perignon 2015",                    0.00, 540.00),
+    ("SW1010", "Sparkling", "Philipponat 2009",                     0.00, 195.00),
+    ("SW1011", "Sparkling", "Lalier Réflexion R020",                0.00, 128.00),
+    ("SW1012", "Sparkling", "Bolle di Borro Rosé 2017",             0.00, 150.00),
+    ("SW1013", "Sparkling", "Berlucchi Cuvée Imperiale 150cl",      0.00, 160.00),
     # White
     ("W2001",  "White",     "San Michele W",                        7.90,  24.00),
     ("W2003",  "White",     "Rocca Bernarda Sauvignon",             0.00,   0.00),
@@ -93,24 +101,25 @@ STOCK_ITEMS = [
     ("R3012",  "Red",       "Tenuta L'Apparita D'Assolo Selezione Bianco", 19.90, 46.00),
     ("R3013",  "Red",       "Brunello Argiano 2020",               80.00, 180.00),
     ("R3014",  "Red",       "Rosso Argiano 2023",                  25.00,  46.00),
-    ("R3015",  "Red",       "Tre Borri Corzano e Paterno 2018",    43.00,   0.00),
-    ("R3016",  "Red",       "Giodo Brunello di Montalcino",        83.00,   0.00),
-    ("R3017",  "Red",       "Magaldo 2016",                         0.00,   0.00),
-    ("R3018",  "Red",       "Tieri del Fula Poggio Torselli 2004", 13.33,   0.00),
-    ("R3019",  "Red",       "Fonterutoli Concerto 2020",           45.00,   0.00),
-    ("R3020",  "Red",       "Fattoria dei Bardi Brunello di Montalcino 2019", 35.00, 0.00),
-    ("R3021",  "Red",       "Le Corti Chianti Classico 2023",      14.00,   0.00),
-    ("R3022",  "Red",       "Le Corti Birillo 2022",               13.00,   0.00),
-    ("R3023",  "Red",       "Le Corti Don Tommaso 2021",           15.00,   0.00),
-    ("R3024",  "Red",       "Collemattoni Rosso di Montalcino 2021", 17.00, 0.00),
-    ("R3025",  "Red",       "Brolio Chianti Classico Ricasoli 2021", 20.00, 0.00),
-    ("R3026",  "Red",       "Millanni Cusona 2015",                40.00,   0.00),
-    ("R3027",  "Red",       "Le Corti Cortevecchia Chianti Classico 2022", 25.00, 0.00),
-    ("R3028",  "Red",       "Ocra Bolgheri Guicciardini 2018",     11.67,   0.00),
+    ("R3015",  "Red",       "Tre Borri Corzano e Paterno 2018",    43.00, 110.00),
+    ("R3016",  "Red",       "Giodo Brunello di Montalcino",        83.00, 240.00),
+    ("R3017",  "Red",       "Magaldo 2016",                         0.00,  95.00),
+    ("R3018",  "Red",       "Tieri del Fula Poggio Torselli 2004", 13.33, 130.00),
+    ("R3019",  "Red",       "Fonterutoli Concerto 2020",           45.00, 130.00),
+    ("R3020",  "Red",       "Fattoria dei Bardi Brunello di Montalcino 2019", 35.00, 85.00),
+    ("R3021",  "Red",       "Le Corti Chianti Classico 2023",      14.00,  32.00),
+    ("R3022",  "Red",       "Le Corti Birillo 2022",               13.00,  36.00),
+    ("R3023",  "Red",       "Le Corti Don Tommaso 2021",           15.00,  38.00),
+    ("R3024",  "Red",       "Collemattoni Rosso di Montalcino 2021", 17.00, 38.00),
+    ("R3025",  "Red",       "Brolio Chianti Classico Ricasoli 2021", 20.00, 54.00),
+    ("R3026",  "Red",       "Millanni Cusona 2015",                40.00, 108.00),
+    ("R3027",  "Red",       "Le Corti Cortevecchia Chianti Classico 2022", 25.00, 50.00),
+    ("R3028",  "Red",       "Ocra Bolgheri Guicciardini 2018",     11.67,  75.00),
     ("R3029",  "Red",       "Pian delle Vigne Rosso Montalcino 2016", 0.00, 58.00),
-    ("R3030",  "Red",       "La Vigna delle Bambole Chianti Classico 2015", 22.00, 0.00),
-    ("R3031",  "Red",       "Duemani 2017",                        90.00,   0.00),
+    ("R3030",  "Red",       "La Vigna delle Bambole Chianti Classico 2015", 22.00, 62.00),
+    ("R3031",  "Red",       "Duemani 2017",                        90.00, 195.00),
     ("R3032",  "Red",       "Matsu",                                0.00,   0.00),
+    ("R3033",  "Red",       "Argiano Brunello di Montalcino 2023",  0.00,  75.00),
     # Red (T)
     ("RT3016", "Red (T)",   "Rosso di Montalcino Cupano 2021",     43.90, 110.00),
     ("RT3017", "Red (T)",   "Lacrima di Moro D'Alba Rubico Marotti Campi 2023", 8.50, 37.00),
@@ -127,6 +136,7 @@ STOCK_ITEMS = [
     ("BR4007", "Beer",      "Birra Peroni 0%",                      1.10,   5.50),
     # Cocktail
     ("C8001",  "Cocktail",  "Roveta Dodici",                        0.00,  18.00),
+    ("C8002",  "Cocktail",  "Omero",                                0.00,   0.00),
     ("C8003",  "Cocktail",  "Aperol Spritz",                        1.73,  10.00),
     ("C8004",  "Cocktail",  "Campari Soda",                         0.24,   4.50),
     # Spirit
@@ -150,6 +160,9 @@ STOCK_ITEMS = [
     ("SP5018", "Spirit",    "Gin Mare 700ml",                      23.72, 120.00),
     ("SP5019", "Spirit",    "Tanqueray Ten Gin 1000ml",            59.00,  99.00),
     ("SP5020", "Spirit",    "Mount Gay Black Rum 700ml",           52.65,  89.00),
+    ("SP5021", "Spirit",    "Monkey 47 Gin",                        0.00,   0.00),
+    ("SP5022", "Spirit",    "Loch Lomond Whisky",                   0.00,   0.00),
+    ("SP5023", "Spirit",    "Captain's Tsipouro",                   0.00,   0.00),
     # Digestivo
     ("D7001",  "Digestivo", "Molinari Sambucca 700ml",              0.00,  60.00),
     ("D7002",  "Digestivo", "Poli Grappa 700ml",                   22.00,  66.00),
@@ -158,6 +171,9 @@ STOCK_ITEMS = [
     ("D7005",  "Digestivo", "Limoncello 500ml",                     4.40,  30.00),
     ("D7006",  "Digestivo", "Skinos 1000ml",                       15.48,  46.44),
     ("D7007",  "Digestivo", "Amaro Certosa / Amaro Del Capo",      35.00, 105.00),
+    ("D7008",  "Digestivo", "Elixir di S.Bernardo",                 0.00,   0.00),
+    ("D7009",  "Digestivo", "Amaro Al Mirto",                       0.00,   0.00),
+    ("D7010",  "Digestivo", "Ciobreliu Thyme Liqueur",              0.00,   7.00),
     # Hot drinks
     ("TC9001", "Hot drinks","Tea (Outside Breakfast)",              0.00,   3.50),
     ("TC9002", "Hot drinks","Coffee (Outside Breakfast)",           0.00,   2.50),
@@ -355,7 +371,8 @@ def init_db():
         "R3021": "Dining Room", "R3022": "Dining Room", "R3023": "Dining Room",
         "R3024": "Dining Room", "R3025": "Dining Room", "R3026": "Dining Room",
         "R3027": "Dining Room", "R3028": "Dining Room", "R3029": "Dining Room",
-        "R3030": "Dining Room", "R3031": "Dining Room", "RT3016": "Dining Room",
+        "R3030": "Dining Room", "R3031": "Dining Room", "R3033": "Dining Room",
+        "RT3016": "Dining Room",
         # Loggia Fridge
         "SW1003": "Loggia Fridge", "W2008": "Loggia Fridge", "W2009": "Loggia Fridge",
         "W2010": "Loggia Fridge", "W2011": "Loggia Fridge",
@@ -366,11 +383,19 @@ def init_db():
         "C8003":  "Loggia Fridge", "C8004":  "Loggia Fridge",
         "D7001":  "Loggia Fridge", "D7005":  "Loggia Fridge",
         "D7006":  "Loggia Fridge", "D7007":  "Loggia Fridge",
+        "D7010":  "Loggia Fridge",
         "SP5008": "Loggia Fridge", "SP5010": "Loggia Fridge",
         # Loggia Glass Cabinet
         "D7002":  "Loggia Glass Cabinet", "SP5012": "Loggia Glass Cabinet",
         "SP5014": "Loggia Glass Cabinet", "SP5015": "Loggia Glass Cabinet",
         "SP5018": "Loggia Glass Cabinet",
+        "SP5021": "Loggia Glass Cabinet", "SP5022": "Loggia Glass Cabinet",
+        "SP5023": "Loggia Glass Cabinet",
+        "D7008":  "Loggia Glass Cabinet", "D7009":  "Loggia Glass Cabinet",
+        "SW1006": "Loggia Glass Cabinet", "SW1007": "Loggia Glass Cabinet",
+        "SW1008": "Loggia Glass Cabinet", "SW1009": "Loggia Glass Cabinet",
+        "SW1010": "Loggia Glass Cabinet", "SW1011": "Loggia Glass Cabinet",
+        "SW1012": "Loggia Glass Cabinet", "SW1013": "Loggia Glass Cabinet",
     }
     for item_id, loc in ITEM_LOCATIONS.items():
         try:
@@ -410,6 +435,7 @@ def init_db():
         "R3029": ("Marchese Antinori",          "Montalcino",            "S"),
         "R3030": ("Il Palaggio di Panzano",     "Greve in Chianti",      "S"),
         "R3031": ("Azienda Agricola Duemani",   "Riparbella / Toscana",  "CF"),
+        "R3033": ("Argiano",                    "Montalcino",            "S"),
         "RT3016": ("Cupano",                    "Montalcino",            "S"),
     }
     for item_id, (winery, region, grape) in DINING_ROOM_DETAILS.items():
@@ -429,12 +455,46 @@ def init_db():
         "SP5014": "Distillation of agave",
         "SP5015": "Anise-flavoured Greek spirit",
         "SP5018": "Mediterranean gin — rosemary, basil, thyme, olive",
+        "SP5021": "German gin — Black Forest botanicals",
+        "SP5022": "Scotch whisky",
+        "SP5023": "Distillation of Greek grapes",
+        "D7008":  "Herbal liqueur",
+        "D7009":  "Herbal liqueur — Sardinian myrtle berry",
+        "D7010":  "Thyme herb liqueur",
     }
     for item_id, desc in GLASS_CABINET_DESCRIPTIONS.items():
         try:
             c.execute(
                 "UPDATE stock_items SET region=? WHERE id=? AND (region IS NULL OR region='')",
                 (desc, item_id)
+            )
+        except Exception:
+            pass
+    conn.commit()
+
+    # Set selling_price_glass for items sold by the glass (Glass Cabinet & Fridge)
+    GLASS_PRICES = {
+        "D7002":  10.00,  # Poli Grappa
+        "D7003":   6.00,  # Averna
+        "D7006":   6.00,  # Skinos
+        "D7007":   8.00,  # Amaro del Capo
+        "D7008":   8.00,  # Elixir di S.Bernardo
+        "D7009":   8.00,  # Amaro Al Mirto
+        "D7010":   7.00,  # Ciobreliu
+        "SP5008": 14.00,  # Grey Goose
+        "SP5010":  8.00,  # VKA Tuscan Vodka
+        "SP5014": 14.00,  # Casamigos Tequila
+        "SP5015":  8.00,  # Ouzo
+        "SP5018":  8.00,  # Gin Mare
+        "SP5021": 10.00,  # Monkey 47
+        "SP5022": 12.00,  # Loch Lomond Whisky
+        "SP5023":  9.00,  # Captain's Tsipouro
+    }
+    for item_id, glass_price in GLASS_PRICES.items():
+        try:
+            c.execute(
+                "UPDATE stock_items SET selling_price_glass=? WHERE id=? AND (selling_price_glass IS NULL OR selling_price_glass=0)",
+                (glass_price, item_id)
             )
         except Exception:
             pass
