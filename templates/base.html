@@ -182,6 +182,9 @@
     <a href="/bookings" class="nav-link {% if request.endpoint == 'bookings' %}active{% endif %}">
       <i class="bi bi-calendar-check"></i><span class="nav-label"> Bookings</span>
     </a>
+    <a href="/menus" class="nav-link {% if request.endpoint == 'menus' %}active{% endif %}">
+      <i class="bi bi-book"></i><span class="nav-label"> Menus</span>
+    </a>
     {% if current_user.is_admin %}
     <a href="/admin" class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}">
       <i class="bi bi-shield-check"></i><span class="nav-label"> Admin</span>

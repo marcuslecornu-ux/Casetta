@@ -821,12 +821,15 @@ def change_password():
     return redirect(url_for("admin"))
 
 
-@app.route("/admin/menu/<path:location>")
+@app.route("/menus")
+@login_required
+def menus():
+    return render_template("menus.html")
+
+
+@app.route("/menu/<path:location>")
 @login_required
 def print_menu(location):
-    if not current_user.is_admin:
-        flash("Admin access only.", "danger")
-        return redirect(url_for("dashboard"))
     conn = get_db()
     items = conn.execute(
         "SELECT * FROM stock_items WHERE location=? AND active=1 ORDER BY selling_price_bottle DESC",
@@ -834,6 +837,12 @@ def print_menu(location):
     ).fetchall()
     conn.close()
     return render_template("menu_print.html", items=items, location=location)
+
+
+@app.route("/admin/menu/<path:location>")
+@login_required
+def print_menu_admin(location):
+    return redirect(url_for("print_menu", location=location))
 
 
 if __name__ == "__main__":
