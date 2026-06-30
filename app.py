@@ -1488,14 +1488,19 @@ def accounting():
     months = [f"{year}-{m:02d}" for m in range(1, 13)]
     month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
+    prop_filter = request.args.get("property", "Casetta")   # default to Casetta only
+    from database import PROPERTIES
+
     conn = get_db()
 
     # ── Accommodation (bookings.total_cost, keyed by arrival month) ──
-    accom_rows = conn.execute("""
+    prop_clause = "" if prop_filter == "All" else " AND (property=? OR (property IS NULL AND ?='Casetta'))"
+    prop_params = [] if prop_filter == "All" else [prop_filter, prop_filter]
+    accom_rows = conn.execute(f"""
         SELECT strftime('%Y-%m', arrival) AS ym, SUM(total_cost) AS total
-        FROM bookings WHERE strftime('%Y', arrival)=? AND confirmed != 'CXL'
+        FROM bookings WHERE strftime('%Y', arrival)=? AND confirmed != 'CXL'{prop_clause}
         GROUP BY ym
-    """, (str(year),)).fetchall()
+    """, ([str(year)] + prop_params)).fetchall()
     accom = {r["ym"]: r["total"] for r in accom_rows}
 
     # ── Drink sales (is_hosted=0) ──
@@ -1518,10 +1523,17 @@ def accounting():
     for r in other_rows:
         other.setdefault(r["type"], {})[r["ym"]] = r["total"]
 
-    # ── Expenses — Paid only (Forecast excluded from P&L) ──
+    # ── Expenses — Paid only, grouped by expense PERIOD (year+month), not entry date ──
     raw_exp_rows = conn.execute("""
-        SELECT strftime('%Y-%m', date) AS ym, category, sub_category, SUM(amount) AS total
-        FROM expenses WHERE strftime('%Y', date)=? AND status='Paid'
+        SELECT
+            year || '-' || CASE TRIM(UPPER(month))
+                WHEN 'JAN' THEN '01' WHEN 'FEB' THEN '02' WHEN 'MAR' THEN '03'
+                WHEN 'APR' THEN '04' WHEN 'MAY' THEN '05' WHEN 'JUN' THEN '06'
+                WHEN 'JUL' THEN '07' WHEN 'AUG' THEN '08' WHEN 'SEP' THEN '09'
+                WHEN 'OCT' THEN '10' WHEN 'NOV' THEN '11' WHEN 'DEC' THEN '12'
+                ELSE '00' END AS ym,
+            category, sub_category, SUM(amount) AS total
+        FROM expenses WHERE year=? AND status='Paid'
         GROUP BY ym, category, sub_category
     """, (str(year),)).fetchall()
 
@@ -1640,6 +1652,9 @@ def accounting():
         profit=profit,
         margin=margin,
         row_total=row_total,
+        # Property filter
+        prop_filter=prop_filter,
+        properties=["All"] + PROPERTIES,
     )
 
 

@@ -21,6 +21,17 @@
   </div>
 </div>
 
+{# ── Property selector ───────────────────────────────────────────────────────── #}
+<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+  <span class="text-muted small fw-semibold me-1">Property:</span>
+  {% for p in properties %}
+  <a href="{{ url_for('accounting', year=year, property=p) }}"
+     class="btn btn-sm {{ 'btn-dark' if prop_filter == p else 'btn-outline-secondary' }}">
+    {% if p == 'All' %}<i class="bi bi-layers me-1"></i>{% elif p == 'Casetta' %}<i class="bi bi-house me-1"></i>{% else %}<i class="bi bi-geo-alt me-1"></i>{% endif %}{{ p }}
+  </a>
+  {% endfor %}
+</div>
+
 {# ── Business Stream selector ─────────────────────────────────────────────────── #}
 <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
   <span class="text-muted small fw-semibold me-1">Business stream:</span>

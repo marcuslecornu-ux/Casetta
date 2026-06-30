@@ -483,6 +483,17 @@ def init_db():
     except Exception:
         pass
 
+    # Tag bookings where guest_name is 'Folegandros' (the Greek property)
+    try:
+        c.execute("""
+            UPDATE bookings SET property = 'Folegandros'
+            WHERE TRIM(UPPER(guest_name)) = 'FOLEGANDROS'
+              AND (property IS NULL OR property = '' OR property = 'Casetta')
+        """)
+        conn.commit()
+    except Exception:
+        pass
+
     # Pre-populate locations from the printed menu sheets
     ITEM_LOCATIONS = {
         # Dining Room — wine cabinet
